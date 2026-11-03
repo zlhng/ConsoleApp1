@@ -16,14 +16,31 @@ namespace DeviceScanner.Utils
     {
         public static Lang Current { get; private set; } = Lang.En;
 
+        [ThreadStatic] private static Lang? _threadLang;      // set by Use(): this thread only
+
         public static void Set(Lang lang) => Current = lang;
+
+        /// <summary>Texts made on this thread use <paramref name="lang"/> until the result is disposed (the UI keeps Current).</summary>
+        public static IDisposable Use(Lang lang)
+        {
+            Lang? before = _threadLang;
+            _threadLang = lang;
+            return new Restore(() => _threadLang = before);
+        }
+
+        private sealed class Restore : IDisposable
+        {
+            private readonly Action _undo;
+            public Restore(Action undo) { _undo = undo; }
+            public void Dispose() => _undo();
+        }
 
         /// <summary>Translated text for <paramref name="key"/>, formatted with <paramref name="args"/> ({0}, {1}, ...).</summary>
         public static string T(string key, params object[] args)
         {
             string text;
             if (!Strings.Table.TryGetValue(key, out var pair)) text = key;                 // unknown key: show the key itself
-            else text = Current == Lang.Zh && !string.IsNullOrEmpty(pair[1]) ? pair[1] : pair[0];
+            else text = (_threadLang ?? Current) == Lang.Zh && !string.IsNullOrEmpty(pair[1]) ? pair[1] : pair[0];
             return args == null || args.Length == 0 ? text : string.Format(CultureInfo.InvariantCulture, text, args);
         }
 
@@ -42,6 +59,9 @@ namespace DeviceScanner.Utils
                 else if (a.Equals("--lang", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) chosen = args[++i];
                 else rest.Add(a);
             }
+#if LITE
+            chosen = "zh";                                  // the lite edition always runs in Chinese
+#endif
 
             if (chosen == null)
             {

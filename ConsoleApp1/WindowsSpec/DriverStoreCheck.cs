@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -47,9 +47,13 @@ namespace DeviceScanner.WindowsSpec
 
                 if (why == null)
                 {
+#if LITE
+                    Log($"    {m.Name}: not used, left out");      // lite: modules it does not use are not reported at all
+#else
                     int present = m.Drivers.Count(store.ContainsKey);
                     Add(group, "module", "used by profile", "N/A", CheckStatus.Pass,
                         $"not used by profile ({string.Join(" / ", m.UsedBy)}); {present}/{m.Drivers.Length} drivers present anyway");
+#endif
                     continue;
                 }
 
@@ -82,10 +86,17 @@ namespace DeviceScanner.WindowsSpec
             if (_profile == null) return uses;
 
             if (!string.IsNullOrWhiteSpace(_profile.ZmcIp)) uses.Add("ZMC");
+#if LITE
+            // lite: the cameras the profile lists still need their drivers for the machine software, even though
+            // lite only pings them; CL3 / COM devices are not used, and the servo USB driver (ServoStudio) is not needed
+            foreach (var d in _profile.ExpectedIp.Where(d => d.Name.Equals("Camera GigE", StringComparison.OrdinalIgnoreCase)))
+                uses.Add(d.Name);
+#else
             foreach (var d in _profile.ExpectedIp) uses.Add(d.Name);
             foreach (var d in _profile.ExpectedCom) uses.Add(d.Name);
             if (_profile.ExpectedCom.Count > 0) uses.Add("com");
             if (_profile.HomePrograms.Count > 0) uses.Add("gantry");
+#endif
             return uses;
         }
 

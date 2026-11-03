@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using DeviceScanner.Utils;
@@ -6,7 +6,7 @@ using DeviceScanner.Utils;
 namespace DeviceScanner.Reporting
 {
     /// <summary>The parts of one run, in the order the report lists them.</summary>
-    internal enum Module { WindowsSpec, Devices, Homing, Io, Discovery }
+    internal enum Module { WindowsSpec, Devices, Homing, Io, Discovery, BurnRun }
 
     internal enum ModuleStatus { Pass, Warn, Fail, NotRun }
 
@@ -35,9 +35,16 @@ namespace DeviceScanner.Reporting
     /// <summary>Turns the raw results in a RunReport into a PASS / WARN / FAIL / NOT RUN per module.</summary>
     internal static class ModuleVerdicts
     {
+#if LITE
+        // lite edition: the Windows spec module only checks the driver store (so missing drivers can be installed)
+        public static readonly Module[] ReportOrder = { Module.WindowsSpec, Module.Devices, Module.Homing, Module.BurnRun };
+
+        public static string Title(Module m) => m == Module.WindowsSpec ? L.T("mod.drivers") : L.T("mod." + m.ToString().ToLowerInvariant());
+#else
         public static readonly Module[] ReportOrder = { Module.WindowsSpec, Module.Devices, Module.Homing, Module.Io, Module.Discovery };
 
         public static string Title(Module m) => L.T("mod." + m.ToString().ToLowerInvariant());
+#endif
 
         public static List<ModuleResult> All(RunReport r) => ReportOrder.Select(m => For(r, m)).ToList();
 
@@ -62,6 +69,7 @@ namespace DeviceScanner.Reporting
                 case Module.Devices: result = Devices(r); break;
                 case Module.Homing: result = Homing(r); break;
                 case Module.Io: result = Io(r); break;
+                case Module.BurnRun: result = BurnRun(r); break;
                 default: result = Discovery(r); break;
             }
             result.Module = m;
@@ -106,6 +114,31 @@ namespace DeviceScanner.Reporting
             var result = new ModuleResult { Status = ModuleStatus.Fail, Failures = 1, Summary = summary };
             result.Problems.Add(h.Detail);
             return result;
+        }
+
+        private static ModuleResult BurnRun(RunReport r)
+        {
+            if (r.BurnRun == null)
+                return NotRun(!r.Profile.Burn.Configured ? L.T("msg.noBurn")
+                              : r.Home?.Success != true ? L.T("burn.needHome") : L.T("mod.skipped"));
+
+            var b = r.BurnRun;
+            string lanes = string.Join("   ", b.Lanes.Select(l => L.T("burn.laneCycles", l.Name, l.Cycles))
+                                               .Concat(b.Programs.Count > 0 ? new[] { L.T("burn.programs", string.Join(", ", b.Programs)) } : new string[0]));
+            string summary = L.T("burn.summary", lanes, b.Elapsed.TotalMinutes);
+            if (b.Failed)
+            {
+                var failed = new ModuleResult { Status = ModuleStatus.Fail, Failures = 1, Summary = summary };
+                failed.Problems.Add(b.Detail);
+                return failed;
+            }
+            if (b.Lanes.Count > 0 && b.Lanes.Sum(l => l.Cycles) == 0)
+            {
+                var warn = new ModuleResult { Status = ModuleStatus.Warn, Warnings = 1, Summary = summary };
+                warn.Problems.Add(L.T("burn.noCycle"));
+                return warn;
+            }
+            return new ModuleResult { Status = ModuleStatus.Pass, Summary = summary };
         }
 
         private static ModuleResult Io(RunReport r)

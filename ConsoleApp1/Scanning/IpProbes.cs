@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using NSW_Components;
 using DeviceScanner.Native;
@@ -28,7 +28,12 @@ namespace DeviceScanner.Scanning
             {
                 var d = new MVC_GenTL();
                 var r = ProbeHelpers.Run(() => d.OpenDevice("Scan", ip), () => { if (d.IsConnected) d.CloseDevice(); });
+#if LITE
+                // lite: the camera NIC is checked once as its own row; which port reaches the camera is only noted
+                return r.Found ? r.WithNote(NicRoute.Note(ip, cfg.CameraNicPnpId)) : r;
+#else
                 return r.Found ? CameraNic(ip, r, cfg.CameraNicPnpId) : r;
+#endif
             }),
             new DeviceProbe(Zmc, ip =>
             {

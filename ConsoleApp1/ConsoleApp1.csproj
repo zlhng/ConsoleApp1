@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -53,11 +53,23 @@
     <ErrorReport>prompt</ErrorReport>
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
+  <!-- Lite edition (drivers, profile IP / COM devices, homing; i10coattwin profile only): msbuild /p:Configuration=Lite /p:Platform=x64 -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Lite|x64'">
+    <OutputPath>bin\x64\Lite\</OutputPath>
+    <DefineConstants>TRACE;LITE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <Prefer32Bit>true</Prefer32Bit>
+    <AllowedReferenceRelatedFileExtensions>.pdb</AllowedReferenceRelatedFileExtensions>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="BouncyCastle.Cryptography, Version=2.0.0.0, Culture=neutral, PublicKeyToken=072edcf4a5328938, processorArchitecture=MSIL">
       <HintPath>..\packages\BouncyCastle.Cryptography.2.7.0\lib\net461\BouncyCastle.Cryptography.dll</HintPath>
     </Reference>
-    <Reference Include="itext.barcodes, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
+    <Reference Include="itext.barcodes, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL" Condition="'$(Configuration)' != 'Lite'">
       <HintPath>..\packages\itext.9.8.0\lib\net461\itext.barcodes.dll</HintPath>
     </Reference>
     <Reference Include="itext.bouncy-castle-adapter, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
@@ -81,19 +93,19 @@
     <Reference Include="itext.layout, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
       <HintPath>..\packages\itext.9.8.0\lib\net461\itext.layout.dll</HintPath>
     </Reference>
-    <Reference Include="itext.pdfa, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
+    <Reference Include="itext.pdfa, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL" Condition="'$(Configuration)' != 'Lite'">
       <HintPath>..\packages\itext.9.8.0\lib\net461\itext.pdfa.dll</HintPath>
     </Reference>
-    <Reference Include="itext.pdfua, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
+    <Reference Include="itext.pdfua, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL" Condition="'$(Configuration)' != 'Lite'">
       <HintPath>..\packages\itext.9.8.0\lib\net461\itext.pdfua.dll</HintPath>
     </Reference>
-    <Reference Include="itext.sign, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
+    <Reference Include="itext.sign, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL" Condition="'$(Configuration)' != 'Lite'">
       <HintPath>..\packages\itext.9.8.0\lib\net461\itext.sign.dll</HintPath>
     </Reference>
-    <Reference Include="itext.styledxmlparser, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
+    <Reference Include="itext.styledxmlparser, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL" Condition="'$(Configuration)' != 'Lite'">
       <HintPath>..\packages\itext.9.8.0\lib\net461\itext.styledxmlparser.dll</HintPath>
     </Reference>
-    <Reference Include="itext.svg, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
+    <Reference Include="itext.svg, Version=9.8.0.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL" Condition="'$(Configuration)' != 'Lite'">
       <HintPath>..\packages\itext.9.8.0\lib\net461\itext.svg.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=5.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -181,6 +193,7 @@
     <Compile Include="DeviceScanner\FirewallAccess.cs" />
     <Compile Include="DeviceScanner\Program.cs" />
     <Compile Include="DeviceScanner\ScanConfig.cs" />
+    <Compile Include="Motion\ConveyorBurnRun.cs" />
     <Compile Include="Motion\DiscreteIoReport.cs" />
     <Compile Include="Motion\ZmcDiscreteIo.cs" />
     <Compile Include="Motion\ZmcHoming.cs" />
@@ -195,6 +208,7 @@
     <Compile Include="Reporting\ModuleVerdicts.cs" />
     <Compile Include="Reporting\PdfReport.cs" />
     <Compile Include="Reporting\RunReport.cs" />
+    <Compile Include="Reporting\ReportMailer.cs" />
     <Compile Include="Reporting\ScanSummary.cs" />
     <Compile Include="UI\ScanWindow.cs" />
     <Compile Include="UI\Spinner.cs" />
@@ -211,6 +225,7 @@
     <Compile Include="Scanning\ProfileVerifier.cs" />
     <Compile Include="Utils\Dialogs.cs" />
     <Compile Include="Utils\Locale.cs" />
+    <Compile Include="Utils\Online.cs" />
     <Compile Include="Utils\RunLog.cs" />
     <Compile Include="Utils\Strings.cs" />
     <Compile Include="WindowsSpec\ChineseNameCheck.cs" />
@@ -231,22 +246,26 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="packages.config" />
-    <Content Include="Profiles\*.profile">
+    <Content Include="Profiles\*.profile" Condition="'$(Configuration)' != 'Lite'">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Profiles\i10coattwin.profile" Condition="'$(Configuration)' == 'Lite'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
   <!-- Third-party DLLs: kept in External\, copied flat next to the exe.
+       Lite leaves out the ones its probes, homing and PDF never load (checked by running every probe and writing a PDF).
        NSW_Components.dll is copied by its Reference; Newtonsoft.Json.dll comes from the NuGet package. -->
   <ItemGroup>
-    <Content Include="External\_msvcp140.dll">
+    <Content Include="External\_msvcp140.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>_msvcp140.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\ACS.SPiiPlusNET.dll">
+    <Content Include="External\ACS.SPiiPlusNET.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>ACS.SPiiPlusNET.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\AdvMotAPI.dll">
+    <Content Include="External\AdvMotAPI.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>AdvMotAPI.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -254,19 +273,19 @@
       <Link>CL3_IF.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\Cognex.Cnx.Common.dll">
+    <Content Include="External\Cognex.Cnx.Common.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>Cognex.Cnx.Common.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\Cognex.DataMan.SDK.Discovery.PC.dll">
+    <Content Include="External\Cognex.DataMan.SDK.Discovery.PC.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>Cognex.DataMan.SDK.Discovery.PC.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\Cognex.DataMan.SDK.PC.dll">
+    <Content Include="External\Cognex.DataMan.SDK.PC.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>Cognex.DataMan.SDK.PC.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\Cognex.DataMan.SDK.Utils.PC.dll">
+    <Content Include="External\Cognex.DataMan.SDK.Utils.PC.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>Cognex.DataMan.SDK.Utils.PC.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -274,7 +293,7 @@
       <Link>concrt140.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\CoronaLink.dll">
+    <Content Include="External\CoronaLink.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>CoronaLink.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -282,7 +301,7 @@
       <Link>cvextern.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\EEIP.dll">
+    <Content Include="External\EEIP.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>EEIP.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -294,39 +313,39 @@
       <Link>Emgu.CV.World.Netstandard.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\HPC15.dll">
+    <Content Include="External\HPC15.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>HPC15.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\libdevices-csharp.dll">
+    <Content Include="External\libdevices-csharp.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>libdevices-csharp.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\libiomp5md.dll">
+    <Content Include="External\libiomp5md.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>libiomp5md.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\libmmd.dll">
+    <Content Include="External\libmmd.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>libmmd.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\LJV7_IF.dll">
+    <Content Include="External\LJV7_IF.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>LJV7_IF.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\LoaderUNloader_Unisem.dll">
+    <Content Include="External\LoaderUNloader_Unisem.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>LoaderUNloader_Unisem.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\MEDAQLib.dll">
+    <Content Include="External\MEDAQLib.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>MEDAQLib.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\MEDAQLib.NET.dll">
+    <Content Include="External\MEDAQLib.NET.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>MEDAQLib.NET.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\MHS3Lib.dll">
+    <Content Include="External\MHS3Lib.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>MHS3Lib.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -338,19 +357,19 @@
       <Link>MvCameraControl.Net.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\NSW_Define.dll">
+    <Content Include="External\NSW_Define.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>NSW_Define.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\NUtils.dll">
+    <Content Include="External\NUtils.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>NUtils.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\Open_eVision_NetApi_2_5.dll">
+    <Content Include="External\Open_eVision_NetApi_2_5.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>Open_eVision_NetApi_2_5.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\opencv_videoio_ffmpeg420_64.dll">
+    <Content Include="External\opencv_videoio_ffmpeg420_64.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>opencv_videoio_ffmpeg420_64.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -358,15 +377,15 @@
       <Link>OPTController.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\svml_dispmd.dll">
+    <Content Include="External\svml_dispmd.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>svml_dispmd.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\System.Drawing.Common.dll">
+    <Content Include="External\System.Drawing.Common.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>System.Drawing.Common.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\tbb.dll">
+    <Content Include="External\tbb.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>tbb.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -378,11 +397,11 @@
       <Link>zauxdll.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\ZKA64.dll">
+    <Content Include="External\ZKA64.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>ZKA64.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\ZKANet64.dll">
+    <Content Include="External\ZKANet64.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>ZKANet64.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -390,15 +409,19 @@
       <Link>zmotion.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- QC email app password: kept out of git, copied next to the exe when present -->
+    <Content Include="mail.secret" Condition="Exists('mail.secret')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Drivers\drivers.zip">
       <Link>drivers.zip</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Drivers\vc_redist.x64.exe">
+    <Content Include="Drivers\vc_redist.x64.exe" Condition="'$(Configuration)' != 'Lite'">
       <Link>vc_redist.x64.exe</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="External\zxing.dll">
+    <Content Include="External\zxing.dll" Condition="'$(Configuration)' != 'Lite'">
       <Link>zxing.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -406,4 +429,8 @@
     <None Include="External\Newtonsoft.Json.dll" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- Lite: NSW_Components references these, but none of the classes the lite probes use load them -->
+  <Target Name="LiteTrim" AfterTargets="Build" Condition="'$(Configuration)' == 'Lite'">
+    <Delete Files="$(OutDir)EEIP.dll;$(OutDir)HPC15.dll;$(OutDir)MEDAQLib.NET.dll" />
+  </Target>
 </Project>

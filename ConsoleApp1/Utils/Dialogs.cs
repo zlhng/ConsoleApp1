@@ -74,15 +74,16 @@ namespace DeviceScanner.Utils
         }
 
         /// <summary>One line of text. OK only works once something is typed; null = window closed / cancelled.</summary>
-        public static string AskText(string question)
+        public static string AskText(string question, string initial = "", IWin32Window owner = null)
         {
-            var box = new TextBox { Width = 320 };
+            var box = new TextBox { Width = 320, Text = initial ?? "" };
             using (var form = new PromptForm(question, SystemIcons.Question, L.T("btn.ok"), L.T("btn.cancel"), box, focusOk: true))
             {
                 form.OkButton.Enabled = false;
                 box.TextChanged += (s, e) => form.OkButton.Enabled = box.Text.Trim().Length > 0;
+                form.OkButton.Enabled = box.Text.Trim().Length > 0;
                 form.ActiveControl = box;
-                return form.ShowDialog() == DialogResult.OK ? box.Text.Trim() : null;
+                return form.ShowDialog(owner) == DialogResult.OK ? box.Text.Trim() : null;
             }
         }
 

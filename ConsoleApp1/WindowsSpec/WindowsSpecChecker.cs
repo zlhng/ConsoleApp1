@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using DeviceScanner.Profiles;
 using DeviceScanner.Reporting;
 
@@ -35,6 +35,9 @@ namespace DeviceScanner.WindowsSpec
             });
             if (!admin) _log("  WARNING: not running as administrator; some checks will show WARN.");
 
+#if LITE
+            SpecCheck[] checks = { new DriverStoreCheck(_spec, _profile, _log) };
+#else
             SpecCheck[] checks =
             {
                 new OsVersionCheck(_spec, _log),
@@ -46,6 +49,7 @@ namespace DeviceScanner.WindowsSpec
                 new ForbiddenAppCheck(_spec, _log),
                 new ChineseNameCheck(_spec, _cfg.ReportDir, _log),   // slowest, last
             };
+#endif
             foreach (var c in checks) c.Run(report);
 
             _log($"\n  Windows spec: {report.Failures} failure(s), {report.Warnings} warning(s) of {report.Items.Count} checks");

@@ -1,4 +1,7 @@
+﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace DeviceScanner
 {
@@ -40,5 +43,28 @@ namespace DeviceScanner
 
         // ----- Windows Firewall -----
         public string FirewallRuleName = "Device Scanner";   // inbound allow rule for this exe, so Windows never asks to allow network access
+
+        // ----- lite edition: runs online only, the report is emailed to QC at the end -----
+        public string QcEmailAddress = "zlhng@nswautomation.com";
+        public string[] QcCc = { "zlhng@gmail.com", "huagulong1234@gmail.com" };
+        // Sent through Gmail so it is not flagged as spam: the envelope From is the Gmail account itself,
+        // the operator's own address (asked before sending) goes in the sender name and Reply-To.
+        public string SmtpHost = "smtp.gmail.com";           // also the online check: this host must answer on SmtpPort
+        public int SmtpPort = 587;
+        public bool SmtpSsl = true;                          // STARTTLS
+        public string SmtpUser = "6cillefong@gmail.com";                  // the Gmail address, also the From address
+        // the Gmail app password is not kept in source: one line in mail.secret next to the exe (git-ignored)
+        public string SmtpPassword => ReadSecret("mail.secret");
+        public int SmtpTimeoutMs = 60000;
+        public int OnlineTimeoutMs = 3000;
+
+        /// <summary>First line of a file next to the exe, spaces removed; empty if the file is missing.</summary>
+        private static string ReadSecret(string fileName)
+        {
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
+            if (!File.Exists(path)) return "";
+            string line = File.ReadLines(path).FirstOrDefault() ?? "";
+            return line.Replace(" ", "").Trim();
+        }
     }
 }

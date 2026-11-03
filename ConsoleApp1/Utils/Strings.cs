@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace DeviceScanner.Utils
 {
@@ -76,6 +76,26 @@ namespace DeviceScanner.Utils
             ["ui.close"]         = new[] { "Close", "关闭" },
             ["ui.rescan"]        = new[] { "Scan again", "重新检测" },
             ["ui.fix"]           = new[] { "Fix problems ({0})", "修复问题（{0}）" },
+            ["ui.email"]         = new[] { "Email report to QC", "发送报告给 QC" },
+
+            // ----- online only / QC email (lite edition) -----
+            ["online.required"]  = new[] { "This PC is offline: the mail server {0}:{1} cannot be reached.\n\nThe scanner only runs online. Connect the PC to the network, then choose Yes to try again (No stops).",
+                                           "电脑处于离线状态：无法连接邮件服务器 {0}:{1}。\n\n本程序只能在线运行。请连接网络后选择“是”重试（选择“否”停止）。" },
+            ["online.offline"]   = new[] { "OFFLINE: {0}:{1} not reachable", "离线：无法连接 {0}:{1}" },
+            ["online.lost"]      = new[] { "network connection lost", "网络连接已断开" },
+            ["online.back"]      = new[] { "network connection back", "网络连接已恢复" },
+            ["online.stopped"]   = new[] { "stopped: the PC went offline", "已停止：电脑离线" },
+            ["mail.ask"]         = new[] { "Send the report to QC now?\n\nTo: {0}\nCc: {1}", "现在将报告发送给 QC？\n\n收件人：{0}\n抄送：{1}" },
+            ["mail.from"]        = new[] { "Sender email address to show on the report email (replies come to it):",
+                                           "请输入报告邮件上显示的发件人邮箱（回复将发到此邮箱）：" },
+            ["mail.noPassword"]  = new[] { "mail.secret (the Gmail app password) is missing next to the exe", "程序目录下缺少 mail.secret（Gmail 应用专用密码）" },
+            ["mail.badFrom"]     = new[] { "\"{0}\" is not an email address.", "“{0}”不是有效的邮箱地址。" },
+            ["mail.sending"]     = new[] { "Emailing the report to {0}", "正在将报告发送至 {0}" },
+            ["mail.sent"]        = new[] { "Report emailed to {0}", "报告已发送至 {0}" },
+            ["mail.failed"]      = new[] { "The report was not emailed: {0}", "报告发送失败：{0}" },
+            ["mail.subject"]     = new[] { "Device scan {0}: {1} ({2})", "设备检测 {0}：{1}（{2}）" },
+            ["mail.body"]        = new[] { "Machine profile: {0}\nOperator: {1}\nStarted: {2}\nPC: {3}\n\nThe PDF report and the log are attached.",
+                                           "机台配置：{0}\n操作员：{1}\n开始时间：{2}\n电脑：{3}\n\n附件为 PDF 报告和日志。" },
 
             // ----- installing missing drivers / VC++ runtime -----
             ["fix.needAdmin"]    = new[] { "Installing drivers, the VC++ runtime and changing network settings needs administrator rights.\n\nClose the scanner, start it again and choose Yes on the Windows prompt.",
@@ -106,9 +126,31 @@ namespace DeviceScanner.Utils
 
             // ----- modules (one PASS / WARN / FAIL / NOT RUN each) -----
             ["mod.windowsspec"]  = new[] { "Windows spec", "Windows 规格" },
+            ["mod.drivers"]      = new[] { "Drivers", "驱动程序" },
             ["mod.devices"]      = new[] { "Devices", "设备" },
             ["mod.homing"]       = new[] { "Gantry homing", "龙门回原点" },
             ["mod.io"]           = new[] { "Discrete IO", "离散 IO" },
+            ["dev.cameraNic"]    = new[] { "Camera NIC (Intel I350)", "相机网卡（Intel I350）" },
+            ["dev.cameraNicMissing"] = new[] { "no network adapter with this hardware ID on this PC", "本机没有此硬件 ID 的网卡" },
+            ["dev.cameraNicPorts"] = new[] { "{0} port(s), need at least {1} (one per camera IP):", "{0} 个端口，至少需要 {1} 个（每个相机 IP 一个）：" },
+            ["dev.cameraRoute"]  = new[] { "Camera NIC route", "相机网卡路由" },
+            ["dev.routeUnknown"] = new[] { "camera answers but its local NIC could not be identified (required {0})", "相机有响应，但无法识别其本机网卡（要求 {0}）" },
+            ["dev.wrongNic"]     = new[] { "camera on the wrong NIC: {0}, required {1}", "相机连接在错误的网卡上：{0}，要求 {1}" },
+            ["dev.nicDown"]      = new[] { "not connected", "未连接" },
+            ["mod.burnrun"]      = new[] { "Conveyor burn run", "输送带空跑" },
+            ["burn.laneCycles"]  = new[] { "{0}: {1} cycle(s)", "{0}：{1} 次" },
+            ["burn.summary"]     = new[] { "{0}   {1:F1} min", "{0}   {1:F1} 分钟" },
+            ["burn.programs"]    = new[] { "programs: {0}", "程序：{0}" },
+            ["burn.stopped"]     = new[] { "stopped by the operator", "操作员已停止" },
+            ["burn.noCycle"]     = new[] { "stopped before any lane finished a cycle", "在任何通道完成一个循环前已停止" },
+            ["burn.needHome"]    = new[] { "not run: homing did not pass", "未运行：回原点未通过" },
+            ["msg.noBurn"]       = new[] { "Profile has no burn.lane lines, skipping.", "配置文件没有 burn.lane，跳过。" },
+            ["prompt.burn"]      = new[] { "Homing done. Run the conveyor burn run ({0}) now?\n\nPut a test board on each lane first. Conveyors, stoppers, lifters and the gantry move; keep hands clear.\nIt keeps cycling until you press Stop burn run.",
+                                           "回原点完成。现在运行输送带空跑（{0}）？\n\n请先在每条通道放一块测试板。输送带、挡板、顶升和龙门会动作，请勿将手伸入。\n将持续循环，直到按下“停止空跑”。" },
+            ["ui.stopBurn"]      = new[] { "Stop burn run", "停止空跑" },
+            ["ui.stoppingBurn"]  = new[] { "Stopping the burn run...", "正在停止空跑……" },
+            ["col.lane"]         = new[] { "Lane", "通道" },
+            ["col.cycles"]       = new[] { "Cycles", "循环次数" },
             ["mod.discovery"]    = new[] { "Discovery", "设备发现" },
             ["mod.counts"]       = new[] { "{0} passed, {1} failed, {2} warning(s) of {3}", "共 {3} 项，通过 {0}，失败 {1}，警告 {2}" },
             ["mod.skipped"]      = new[] { "skipped by the operator", "操作员选择跳过" },

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -77,6 +77,7 @@ namespace DeviceScanner.Reporting
                         case Module.Homing: HomingTable(doc, r); break;
                         case Module.Io: IoTable(doc, r); break;
                         case Module.Discovery: DiscoveryTable(doc, r); break;
+                        case Module.BurnRun: BurnRunTable(doc, r); break;
                     }
                 }
 
@@ -156,6 +157,25 @@ namespace DeviceScanner.Reporting
                 L.T("col.status"), L.T("col.programs"), L.T("col.axes"), L.T("col.time"), L.T("col.detail"));
             Row(t, 0, h.Success ? Tone.Pass : Tone.Fail, L.T(h.Success ? "tag.pass" : "tag.fail"),
                 h.Programs, string.Join(",", h.Axes), Elapsed(h.Elapsed), h.Detail);
+            doc.Add(t);
+        }
+
+        private void BurnRunTable(Document doc, RunReport r)
+        {
+            var b = r.BurnRun;
+            var t = DataTable(new float[] { 10, 20, 12, 58 },
+                L.T("col.status"), L.T("col.lane"), L.T("col.cycles"), L.T("col.detail"));
+            int row = 0;
+            foreach (var l in b.Lanes)
+            {
+                bool failed = l.Failure.Length > 0;
+                Row(t, row++, failed ? Tone.Fail : Tone.Pass, L.T(failed ? "tag.fail" : "tag.pass"),
+                    l.Name, l.Cycles.ToString(), failed ? l.Failure : b.StoppedByOperator ? L.T("burn.stopped") : "");
+            }
+            foreach (string program in b.Programs)
+                Row(t, row++, Tone.Pass, L.T("tag.pass"), "RUN " + program, "", b.StoppedByOperator ? L.T("burn.stopped") : "");
+            if (b.Failed && b.Lanes.All(l => l.Failure.Length == 0))
+                Row(t, row, Tone.Fail, L.T("tag.fail"), "", "", b.Detail);
             doc.Add(t);
         }
 

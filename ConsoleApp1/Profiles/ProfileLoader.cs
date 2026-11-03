@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -30,6 +30,11 @@ namespace DeviceScanner.Profiles
             }
 
             if (string.IsNullOrWhiteSpace(p.ZmcIp)) throw new FormatException($"{file}: zmc.ip is required");
+            foreach (var lane in p.Burn.Lanes)
+            {
+                if (lane.Pro == null) throw new FormatException($"{file}: burn lane \"{lane.Name}\" has no PRO station");
+                if (p.Burn.UsePre && lane.Pre == null) throw new FormatException($"{file}: burn.mode = PRE_PRO but lane \"{lane.Name}\" has no PRE station");
+            }
             return p;
         }
 
@@ -46,8 +51,107 @@ namespace DeviceScanner.Profiles
                 case "ip.expect": p.ExpectedIp.Add(ParseDevice(val)); break;
                 case "com.expect": p.ExpectedCom.Add(ParseDevice(val)); break;
                 case "io": p.IoTests.Add(ParseIo(val)); break;
+                case "burn.mode": p.Burn.UsePre = ParseMode(val); break;
+                case "burn.speed": ParseSpeed(p.Burn, val); break;
+                case "burn.loadin": ParseLoadIn(p.Burn, val); break;
+                case "burn.timeout": ParseTimeout(p.Burn, val); break;
+                case "burn.lane": p.Burn.Lanes.Add(ParseLane(val)); break;
+                case "burn.station": ParseStation(p.Burn, val); break;
+                case "burn.programs": p.Burn.Programs.AddRange(SplitList(val)); break;
+                case "burn.stop": p.Burn.StopPrograms.AddRange(SplitList(val)); break;
                 default: throw new FormatException($"unknown key \"{key}\"");
             }
+        }
+
+        // ---------- conveyor burn run ----------
+
+        private static bool ParseMode(string val)
+        {
+            switch (val.ToUpperInvariant())
+            {
+                case "PRO": return false;
+                case "PRE_PRO": return true;
+                default: throw new FormatException($"burn.mode must be PRO or PRE_PRO, got \"{val}\"");
+            }
+        }
+
+        // burn.speed = fast, slow, slow after ms
+        private static void ParseSpeed(BurnRunSetup b, string val)
+        {
+            string[] f = SplitList(val);
+            if (f.Length < 1 || f.Length > 3) throw new FormatException("expected \"burn.speed = fast, slow, slow after ms\"");
+            b.Speed = ParseDouble(f[0], "speed");
+            if (f.Length > 1) b.SlowSpeed = ParseDouble(f[1], "slow speed");
+            if (f.Length > 2) b.SlowAfterMs = ParseInt(f[2], "slow after ms");
+        }
+
+        // burn.loadin = delay ms, reverse distance
+        private static void ParseLoadIn(BurnRunSetup b, string val)
+        {
+            string[] f = SplitList(val);
+            if (f.Length < 1 || f.Length > 2) throw new FormatException("expected \"burn.loadin = delay ms, reverse distance\"");
+            b.LoadInDelayMs = ParseInt(f[0], "load-in delay ms");
+            if (f.Length > 1) b.ReverseDist = ParseDouble(f[1], "reverse distance");
+        }
+
+        // burn.timeout = sensor ms, io ms
+        private static void ParseTimeout(BurnRunSetup b, string val)
+        {
+            string[] f = SplitList(val);
+            if (f.Length < 1 || f.Length > 2) throw new FormatException("expected \"burn.timeout = sensor ms, io ms\"");
+            b.SensorTimeoutMs = ParseInt(f[0], "sensor timeout ms");
+            if (f.Length > 1) b.IoTimeoutMs = ParseInt(f[1], "io timeout ms");
+        }
+
+        // burn.lane = name | conveyor axes | board-in IN | board-out IN | tension roller OP or -
+        private static BurnLane ParseLane(string val)
+        {
+            string[] f = SplitFields(val);
+            if (f.Length < 4 || f.Length > 5 || f[0].Length == 0)
+                throw new FormatException("expected \"name | conveyor axes | board-in IN | board-out IN | tension roller OP\"");
+            return new BurnLane
+            {
+                Name = f[0],
+                Axes = SplitList(f[1]).Select(s => ParseInt(s, "conveyor axis")).ToArray(),
+                BoardIn = ParseInt(f[2], "board-in input"),
+                BoardOut = ParseInt(f[3], "board-out input"),
+                Tension = f.Length > 4 && f[4].Length > 0 && f[4] != "-" ? ParseInt(f[4], "tension roller output") : (int?)null,
+            };
+        }
+
+        // burn.station = lane | PRE or PRO | stopper | lifter | precisor | vacuum | board present IN
+        private static void ParseStation(BurnRunSetup b, string val)
+        {
+            string[] f = SplitFields(val);
+            if (f.Length != 7)
+                throw new FormatException("expected \"lane | PRE or PRO | stopper | lifter | precisor | vacuum | board present IN\"");
+
+            var lane = b.Lanes.FirstOrDefault(l => l.Name.Equals(f[0], StringComparison.OrdinalIgnoreCase))
+                       ?? throw new FormatException($"burn.station for unknown lane \"{f[0]}\" (put its burn.lane line first)");
+            var station = new BurnStation
+            {
+                Name = $"{lane.Name} {f[1].ToUpperInvariant()}",
+                Stopper = ParsePair(f[2], "stopper"),
+                Lifter = ParsePair(f[3], "lifter"),
+                Precisor = ParsePair(f[4], "precisor"),
+                Vacuum = ParsePair(f[5], "vacuum"),
+                Present = f[6].Length > 0 && f[6] != "-" ? ParseInt(f[6], "board present input") : (int?)null,
+            };
+            switch (f[1].ToUpperInvariant())
+            {
+                case "PRE": lane.Pre = station; break;
+                case "PRO": lane.Pro = station; break;
+                default: throw new FormatException($"station must be PRE or PRO, got \"{f[1]}\"");
+            }
+        }
+
+        private static IoPair ParsePair(string s, string what)
+        {
+            if (s.Length == 0 || s == "-") return IoPair.None;
+            string[] f = s.Split('/').Select(x => x.Trim()).ToArray();
+            if (f.Length > 2) throw new FormatException($"{what} must be \"out/in\", \"out\" or \"-\", got \"{s}\"");
+            int? inNo = f.Length == 2 && f[1].Length > 0 && f[1] != "-" ? ParseInt(f[1], what + " input") : (int?)null;
+            return new IoPair(ParseInt(f[0], what + " output"), inNo);
         }
 
         private static ExpectedDevice ParseDevice(string val)
@@ -97,5 +201,9 @@ namespace DeviceScanner.Profiles
         private static int ParseInt(string s, string what) =>
             int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out int v)
                 ? v : throw new FormatException($"{what} must be a whole number, got \"{s}\"");
+
+        private static double ParseDouble(string s, string what) =>
+            double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out double v)
+                ? v : throw new FormatException($"{what} must be a number, got \"{s}\"");
     }
 }

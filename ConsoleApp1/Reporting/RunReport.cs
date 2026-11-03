@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using DeviceScanner.Profiles;
 using DeviceScanner.Scanning;
@@ -40,6 +40,23 @@ namespace DeviceScanner.Reporting
         public TimeSpan Elapsed { get; set; }
     }
 
+    internal sealed class BurnLaneResult
+    {
+        public string Name { get; set; } = "";
+        public int Cycles { get; set; }                 // complete return / load / out cycles
+        public string Failure { get; set; } = "";
+    }
+
+    internal sealed class BurnRunResult
+    {
+        public bool Failed { get; set; }
+        public string Detail { get; set; } = "";        // failure reason
+        public bool StoppedByOperator { get; set; }
+        public List<BurnLaneResult> Lanes { get; } = new List<BurnLaneResult>();
+        public List<string> Programs { get; } = new List<string>();    // controller programs that were started
+        public TimeSpan Elapsed { get; set; }
+    }
+
     /// <summary>Everything one run produced; ScanSummary prints it at the end.</summary>
     internal sealed class RunReport
     {
@@ -52,6 +69,7 @@ namespace DeviceScanner.Reporting
         public ComScanReport DiscoveredCom { get; set; }
         public List<AddressFix> AddressFixes { get; } = new List<AddressFix>();   // address changes made by discovery
         public HomeResult Home { get; set; }                   // null = not run
+        public BurnRunResult BurnRun { get; set; }             // null = not run
         public bool IoRun { get; set; }
         public string IoError { get; set; }                    // IO test was wanted but could not start (e.g. ZMC not reachable)
         public List<IoTestResult> Io { get; } = new List<IoTestResult>();

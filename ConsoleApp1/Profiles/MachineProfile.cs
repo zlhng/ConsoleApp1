@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace DeviceScanner.Profiles
 {
@@ -24,6 +25,62 @@ namespace DeviceScanner.Profiles
 
         // ----- discrete IO loopback -----
         public List<IoTestCase> IoTests { get; } = new List<IoTestCase>();
+
+        // ----- conveyor burn run (lanes empty = not configured) -----
+        public BurnRunSetup Burn { get; } = new BurnRunSetup();
+    }
+
+    /// <summary>
+    /// Conveyor dry run per lane, as OneDispenser's I10_TWIN_DL.LoadBoardDryRun_C1/_C2:
+    /// return to board-in, (load PRE), load PRO A, load out, again until the operator stops it.
+    /// </summary>
+    internal sealed class BurnRunSetup
+    {
+        public bool UsePre { get; set; }                   // StationMode 1 (PRE_PRO): stop at PRE before PRO
+        public double Speed { get; set; } = 100;           // conveyor jog speed, controller units/s
+        public double SlowSpeed { get; set; } = 20;
+        public int SlowAfterMs { get; set; }               // 0 = never slow down
+        public int LoadInDelayMs { get; set; }             // keep running this long after board present
+        public double ReverseDist { get; set; }            // then back the conveyor off by this much (0 = no)
+        public int SensorTimeoutMs { get; set; } = 10000;  // board-in / present / out sensors
+        public int IoTimeoutMs { get; set; } = 5000;       // stopper / lifter / precisor / vacuum feedback
+        public List<BurnLane> Lanes { get; } = new List<BurnLane>();
+        public List<string> Programs { get; } = new List<string>();   // controller programs RUN alongside, STOPped with it
+        public List<string> StopPrograms { get; } = new List<string>(); // RUN on stop instead of RAPIDSTOP(2), e.g. MotionStop
+        public bool Configured => Lanes.Count > 0 || Programs.Count > 0;
+    }
+
+    internal sealed class BurnLane
+    {
+        public string Name { get; set; }
+        public int[] Axes { get; set; } = new int[0];      // conveyor axes jogged together
+        public int BoardIn { get; set; }                   // IN numbers
+        public int BoardOut { get; set; }
+        public int? Tension { get; set; }                  // tension roller OP, null = not fitted
+        public BurnStation Pre { get; set; }
+        public BurnStation Pro { get; set; }
+        public IEnumerable<BurnStation> Stations => new[] { Pre, Pro }.Where(s => s != null);
+    }
+
+    /// <summary>One working station on a lane; each module is an output with an optional feedback input.</summary>
+    internal sealed class BurnStation
+    {
+        public string Name { get; set; }
+        public IoPair Stopper { get; set; } = IoPair.None;
+        public IoPair Lifter { get; set; } = IoPair.None;
+        public IoPair Precisor { get; set; } = IoPair.None;
+        public IoPair Vacuum { get; set; } = IoPair.None;
+        public int? Present { get; set; }                  // board present IN
+    }
+
+    /// <summary>"out/in", "out" (no feedback) or "-" (not fitted, skipped).</summary>
+    internal sealed class IoPair
+    {
+        public static readonly IoPair None = new IoPair(null, null);
+        public int? Out { get; }
+        public int? In { get; }
+        public IoPair(int? outNo, int? inNo) { Out = outNo; In = inNo; }
+        public override string ToString() => Out == null ? "-" : In == null ? $"OP({Out})" : $"OP({Out})/IN({In})";
     }
 
     /// <summary>A device the profile says must answer at an IP address or COM port.</summary>

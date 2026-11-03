@@ -1,4 +1,4 @@
-using DeviceScanner.Motion;
+﻿using DeviceScanner.Motion;
 using DeviceScanner.Native;
 using DeviceScanner.Profiles;
 using DeviceScanner.Reporting;
@@ -24,6 +24,8 @@ namespace DeviceScanner
             public string Question { get; set; }      // null = always runs (nothing on the machine moves)
             public bool Caution { get; set; }         // the machine moves: asked with a warning, and confirmed before a full run
             public bool Available { get; set; } = true;
+            public bool AlwaysAsk { get; set; }       // asked even in a full run (decided only once the earlier steps are done)
+            public Func<bool> Ready { get; set; }     // checked just before the step; false = skipped without asking
             public Action Work { get; set; }
         }
 
@@ -48,6 +50,11 @@ namespace DeviceScanner
             // not elevated: start again through the UAC prompt and let that copy do the run
             if (AdminRestart.Run(ref args) != AdminRestart.Outcome.Continue) return;
             FirewallAccess.Allow(cfg, log.Add);     // so Windows never stops the scan to ask "Allow access?"
+#if LITE
+            // lite: never runs offline, the report is emailed to QC at the end
+            if (!Online.WaitFor(cfg, q => Dialogs.Confirm(q, caution: true, yesByDefault: true), log.Add)) return;
+            Online.Watch(s => log.Add(s));          // follows "log" across scan again; kept until the exe exits
+#endif
 
             string user = Dialogs.AskText(L.T("prompt.username"));     // who is running the audit, printed in the report as typed
             if (user == null) return;
@@ -58,28 +65,61 @@ namespace DeviceScanner
             var report = new RunReport(profile) { UserName = user, StartedAt = started };
             ScanWindow window = null;                                  // device address changes are confirmed in it
             Func<string, bool> confirm = q => window.Ask(q, true);
-            List<Step> steps = Steps(cfg, profile, report, log.Add, confirm);
+            Func<Action, IDisposable> stopButton = stop => window.ShowStop(stop);
+            List<Step> steps = Steps(cfg, profile, report, log.Add, confirm, stopButton);
 
+#if LITE
+            bool? runAll = ConfirmFullRun(steps) ? true : (bool?)null;      // lite: always a full run
+#else
             bool? runAll = ChooseMode(steps);
+#endif
             if (runAll == null) return;
 
             // "Scan again" closes the window and runs once more with the same operator, profile and run mode
             while (true)
             {
-                window = new ScanWindow(report, steps.Select(s => s.Module), log,
+                window = new ScanWindow(report, cfg, steps.Select(s => s.Module), log,
                                             w => RunSteps(w, steps, runAll.Value, report, cfg, log));
                 Application.Run(window);
                 if (!window.RescanRequested) return;
 
                 log = new RunLog();
                 report = new RunReport(profile) { UserName = user, StartedAt = DateTime.Now };
-                steps = Steps(cfg, profile, report, log.Add, confirm);
+                steps = Steps(cfg, profile, report, log.Add, confirm, stopButton);
             }
         }
 
+#if LITE
+        /// <summary>
+        /// Lite edition: drivers (missing ones installed from the fix button), the profile's IP / COM devices and homing.
+        /// No other Windows spec checks, no discovery, no IO loopback.
+        /// </summary>
+        private static List<Step> Steps(ScanConfig cfg, MachineProfile profile, RunReport report, Action<string> log,
+                                            Func<string, bool> confirm, Func<Action, IDisposable> stopButton) => new List<Step>
+        {
+            new Step { Module = Module.WindowsSpec, Work = () => report.WindowsSpec = new WindowsSpecChecker(cfg, new WindowsSpecConfig(), profile, log).Run() },
+
+            new Step { Module = Module.Devices, Work = () => new ProfileVerifier(cfg, profile, log).Run(report) },
+
+            new Step { Module = Module.Homing, Caution = true, Available = profile.HomePrograms.Count > 0,
+                       Question = L.T("prompt.home", string.Join(", ", profile.HomePrograms)),
+                       Work = () => report.Home = new ZmcHoming(cfg, profile, log).Run() },
+
+            // conveyor burn run, asked once homing has passed; runs until the operator presses Stop
+            new Step { Module = Module.BurnRun, Caution = true, AlwaysAsk = true, Available = profile.Burn.Configured,
+                       Ready = () => report.Home?.Success == true,
+                       Question = L.T("prompt.burn", string.Join(", ", profile.Burn.Lanes.Select(l => l.Name)
+                                                                  .Concat(profile.Burn.Programs.Select(x => "RUN " + x)))),
+                       Work = () =>
+                       {
+                           var burn = new ConveyorBurnRun(cfg, profile, log);
+                           using (stopButton(burn.Stop)) report.BurnRun = burn.Run();
+                       } },
+        };
+#else
         /// <summary>The modules in the order they run.</summary>
         private static List<Step> Steps(ScanConfig cfg, MachineProfile profile, RunReport report, Action<string> log,
-                                            Func<string, bool> confirm) => new List<Step>
+                                            Func<string, bool> confirm, Func<Action, IDisposable> stopButton) => new List<Step>
         {
             // 0. Windows golden-image spec (read only: OS, locale, Defender, NIC settings, drivers, apps, Chinese file names)
             new Step { Module = Module.WindowsSpec, Question = L.T("prompt.spec"),
@@ -100,6 +140,7 @@ namespace DeviceScanner
             new Step { Module = Module.Io, Caution = true, Available = profile.IoTests.Count > 0,
                        Question = L.T("prompt.io", profile.IoTests.Count), Work = () => RunIoTests(cfg, profile, report, log) },
         };
+#endif
 
         /// <summary>
         /// Full run (no more questions) or one by one (asked before each module). A full run that moves the machine
@@ -113,11 +154,15 @@ namespace DeviceScanner
                 selected = Dialogs.Choose(L.T("mode.question"), new[] { L.T("mode.all"), L.T("mode.each") }, selected);
                 if (selected < 0) return null;
                 if (selected == 1) return false;
-
-                var moving = steps.Where(s => s.Available && s.Caution).Select(s => "• " + s.Question).ToList();
-                if (moving.Count == 0 || Dialogs.Confirm(L.T("mode.allCaution") + "\n\n" + string.Join("\n\n", moving), caution: true))
-                    return true;
+                if (ConfirmFullRun(steps)) return true;
             }
+        }
+
+        /// <summary>A full run that moves the machine is confirmed once, listing the warnings the single questions give.</summary>
+        private static bool ConfirmFullRun(List<Step> steps)
+        {
+            var moving = steps.Where(s => s.Available && s.Caution && !s.AlwaysAsk).Select(s => "• " + s.Question).ToList();
+            return moving.Count == 0 || Dialogs.Confirm(L.T("mode.allCaution") + "\n\n" + string.Join("\n\n", moving), caution: true);
         }
 
         /// <summary>Runs on the scan window's worker thread.</summary>
@@ -125,9 +170,14 @@ namespace DeviceScanner
         {
             try
             {
+                bool stopped = false;               // lite: the PC went offline and the operator gave up waiting
                 foreach (var step in steps)
                 {
-                    bool run = step.Available && (step.Question == null || runAll || window.Ask(step.Question, step.Caution));
+#if LITE
+                    if (!stopped && !Online.WaitFor(cfg, q => window.Ask(q, true), log.Add)) { stopped = true; log.Add(L.T("online.stopped")); }
+#endif
+                    bool run = !stopped && step.Available && (step.Ready == null || step.Ready())
+                               && (step.Question == null || (runAll && !step.AlwaysAsk) || window.Ask(step.Question, step.Caution));
                     if (run)
                     {
                         log.Add("");

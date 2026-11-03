@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using DeviceScanner.Utils;
@@ -14,13 +14,20 @@ namespace DeviceScanner.Profiles
     {
         private const string Folder = "Profiles";
         private const string Pattern = "*.profile";
+#if LITE
+        private const string LiteProfile = "i10coattwin";      // the lite edition is built for this machine only
+#endif
 
         public static MachineProfile Select(string[] args, Action<string> log)
         {
             string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Folder);
             try
             {
+#if LITE
+                string path = Resolve(LiteProfile, dir);
+#else
                 string path = args.Length > 0 ? Resolve(args[0], dir) : Pick(dir, log);
+#endif
                 if (path == null) return null;
 
                 var profile = ProfileLoader.Load(path);

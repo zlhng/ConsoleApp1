@@ -1,4 +1,4 @@
-# ==============================================================
+﻿# ==============================================================
 # DeviceScanner machine profile
 # EXAMPLE built from the SD1X block in FactoryReset - edit it to match the real machine.
 # To test another machine, copy this file and change the values. Nothing else needs editing.
@@ -100,3 +100,51 @@ io = Chuck vac 4              | 87 | 93 | 1000 | optional
 
 # door lock: only locks with the door closed
 io = Door lock                | 11 | 15 | 1000 | optional
+
+# ---------- conveyor burn run (lite: asked after homing, runs until Stop) ----------
+# Port of OneDispenser I10_TWIN_DL.LoadBoardDryRun_C1 / _C2. Each cycle per lane:
+#   return to board-in -> (PRE_PRO: load PRE) -> load PRO A -> load out.  Lane 1 then lane 2, repeated.
+# A test board must be on each lane before starting.
+# burn.mode    = PRO | PRE_PRO
+# burn.speed   = fast, slow, slow after ms        (controller units/s; slow after 0 = never)
+# burn.loadin  = delay ms, reverse distance       (after board present)
+# burn.timeout = sensor ms, io ms
+# burn.lane    = name | conveyor axes | board-in IN | board-out IN | tension roller OP or -
+# burn.station = lane | PRE or PRO | stopper | lifter | precisor | vacuum | board present IN
+# burn.programs = controller programs RUN when the burn run starts, STOPped (and RAPIDSTOP(2)) when it stops
+#                each module: out/in, out (no feedback) or - (not fitted)
+#
+# Numbers from OneDispenser TC_SYSTEM.FactoryReset, I_SERIES twin block (I_SERIES_TWIN_SHARED_STATION):
+#   Conveyor_1 = axis 0, Conveyor_2 = axis 1. Shared station is not "dual lane", so TF_CONVEYOR jogs
+#   both conveyor axes for either lane, at the Conveyor_1 speed.
+#   IN 36/42 SENS_BOARD_IN_1/2, IN 41/47 SENS_BOARD_OUT_1/2,
+#   IN 37/43 SENS_BOARD_PRESENT_PRO_A_1/2, IN 48/54 SENS_BOARD_PRESENT_PRE_A_1/2 (first bank; GetInput takes the first match)
+#   precisor feedback: SENS_PRECISOR_EXT_PRO_A_1 / PRE_A_1 are not mapped (52/53 are EXT_1/EXT_2),
+#     so lane 1 precisors run without feedback; lane 2 uses 68 / 69
+#   vacuum: OP 45 SV_CHUCK_VAC_PRO_A_1 (no VAC_CHUCK_ON_PRO_A_1 input), PRO A2 not mapped,
+#     PRE A1 80/86, PRE A2 81/87
+#   tension rollers (SV_TENSION_ROLLER_LIFTER_1/2) and kickers are not mapped on this model
+# Not in FactoryReset (OneDispenser process settings): check against the machine before relying on them
+#   burn.mode    <- StationMode (0 = PRO, 1 = PRE_PRO)
+#   burn.speed   <- Conveyor_1 FastVelocity, StartVelocity, BoardLoadSlow_Delay (fast = CSPEED from the .bas)
+#   burn.loadin  <- BoardLoadINLeft_Delay, BoardInRevDist
+#   burn.timeout <- BoardSensIn / BoardSensOut timeout, IO module timeout (5000 in TF_CONVEYOR)
+
+# From the controller project D:\ssvbas.zip  I10\i-TWIN_ZMC432_(GantryMode)_R00_Oct2025 (FW 1.0.0, 2025-09-30):
+#   axes  GX1 6, GX2 7, GY1 8, GZ1 9 | GX3 10, GX4 11, GY2 12, GZ2 13 (gantry pairs 6/7 and 10/11), UNITS 2000
+#   RunXY.bas  XY burn-in: GX1/GX3/GY1/GY2 SPEED 300, ACCEL 10000, 7-point loop, never ends on its own
+#   RunZ.bas   Z burn-in:  GZ1/GZ2 SPEED 50, ACCEL 2000, Z 0 .. -55 mm, never ends on its own
+#   MotionStop.bas  STOP "RunXY.bas" / STOP "RunZ.bas", then CANCEL(2) on axes 6-13
+#   conveyors  CONV1_AXIS 0, CONV2_AXIS 1, CUNITS 22.15 (6 mm roller, so mm), CSPEED 100, CACCEL 500 (set by InitSystem)
+burn.programs = RunXY, RunZ       # RUN "RunXY.bas", RUN "RunZ.bas" when the burn run starts
+burn.stop     = MotionStop        # RUN "MotionStop.bas" on Stop (after STOP of each program)
+burn.mode    = PRO
+burn.speed   = 100, 20, 0         # CSPEED 100 mm/s from Variables.bas; slow speed unused while slow-after is 0
+burn.loadin  = 0, 0
+burn.timeout = 10000, 5000
+burn.lane    = lane 1 | 0, 1 | 36 | 41 | -
+burn.station = lane 1 | PRE | 54/49 | 55/50 | 61    | 80/86 | 48
+burn.station = lane 1 | PRO | 36/38 | 37/39 | 60    | 45    | 37
+burn.lane    = lane 2 | 0, 1 | 42 | 47 | -
+burn.station = lane 2 | PRE | 57/55 | 58/56 | 63/69 | 81/87 | 54
+burn.station = lane 2 | PRO | 39/44 | 40/45 | 62/68 | -     | 43

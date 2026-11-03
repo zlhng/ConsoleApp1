@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Lite release zip (built locally, not committed)
+dist/
+
+# Gmail app password for the QC email (ConsoleApp1/mail.secret), never committed
+mail.secret

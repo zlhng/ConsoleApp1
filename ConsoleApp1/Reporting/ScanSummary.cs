@@ -1,4 +1,4 @@
-using DeviceScanner.Utils;
+﻿using DeviceScanner.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -59,7 +59,12 @@ namespace DeviceScanner.Reporting
         {
             try
             {
+#if LITE
+                // lite: the screen is Chinese, but the PDF goes to QC, so it is always written in English
+                using (L.Use(Lang.En)) new PdfReport(cfg).Save(path, r, ModuleVerdicts.All(r), finished);
+#else
                 new PdfReport(cfg).Save(path, r, modules, finished);
+#endif
 
                 if (!File.Exists(path))
                 {

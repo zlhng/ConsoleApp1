@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -55,15 +55,19 @@ namespace DeviceScanner.UI
         private Stopwatch _clock;
         private int _logShown;
         private volatile bool _running;
+        private Button _stopBurn;
+        private volatile Action _onStop;              // set while the conveyor burn run is going
         private ScanFiles _files;
         private readonly RunReport _report;
+        private readonly ScanConfig _cfg;
         private List<string> _missingDrivers = new List<string>();
         private bool _vcMissing;
         private List<NicSettingFix> _nicFixes = new List<NicSettingFix>();
 
-        public ScanWindow(RunReport report, IEnumerable<Module> order, RunLog log, Action<ScanWindow> work)
+        public ScanWindow(RunReport report, ScanConfig cfg, IEnumerable<Module> order, RunLog log, Action<ScanWindow> work)
         {
             _report = report;
+            _cfg = cfg;
             _log = log;
             _work = work;
 
@@ -92,14 +96,25 @@ namespace DeviceScanner.UI
             _close = Button(L.T("ui.close"), (s, e) => Close());
             _rescan = Button(L.T("ui.rescan"), (s, e) => { RescanRequested = true; Close(); });
             _rescan.Enabled = false;
+#if LITE
+            _openPdf = Button(L.T("ui.email"), (s, e) => Email());      // lite: the report goes to QC by email instead
+#else
             _openPdf = Button(L.T("ui.openPdf"), (s, e) => Open(_files?.PdfPath));
+#endif
             _openLog = Button(L.T("ui.openLog"), (s, e) => Open(_files?.LogPath));
             _toggleLog = Button(L.T("ui.showLog"), (s, e) => ToggleLog());
             _fix = Button("", (s, e) => Fix());
             _fix.ForeColor = FailFg;
             _fix.Visible = false;
+            _stopBurn = Button(L.T("ui.stopBurn"), (s, e) => StopBurn());
+            _stopBurn.ForeColor = FailFg;
+            _stopBurn.Visible = false;
             _openPdf.Enabled = _openLog.Enabled = false;
+#if LITE
+            bar.Controls.AddRange(new Control[] { _close, _rescan, _openPdf, _fix, _stopBurn });
+#else
             bar.Controls.AddRange(new Control[] { _close, _rescan, _openPdf, _fix, _openLog, _toggleLog });
+#endif
             Controls.Add(bar);
 
             _tick.Tick += (s, e) => ShowNewLog();
@@ -186,7 +201,64 @@ namespace DeviceScanner.UI
             ShowFix(SpecFixer.MissingDrivers(_report.WindowsSpec), VcRuntimeCheck.Missing(_report.WindowsSpec),
                     _report.WindowsSpec?.NicFixes.ToList() ?? new List<NicSettingFix>());
             Activate();
+#if LITE
+            if (_openPdf.Enabled) BeginInvoke(new Action(Email));      // asked once the window has settled
+#endif
         }));
+
+#if LITE
+        /// <summary>Asks, then emails the PDF and the log to the QC address on a worker thread (waits for the PC to be online).</summary>
+        private void Email()
+        {
+            if (_running || _files?.PdfPath == null) return;
+            if (!Dialogs.Confirm(L.T("mail.ask", _cfg.QcEmailAddress, string.Join(", ", _cfg.QcCc)), yesByDefault: true, owner: this)) return;
+            string sender = AskSender();
+            if (sender == null) return;
+            if (!Online.WaitFor(_cfg, q => Dialogs.Confirm(q, caution: true, yesByDefault: true, owner: this), _log.Add)) return;
+
+            _running = true;
+            _openPdf.Enabled = _rescan.Enabled = _fix.Enabled = false;
+            _status.Text = L.T("mail.sending", _cfg.QcEmailAddress) + "...";
+            _status.ForeColor = Muted;
+            int logStart = _log.Count;
+            var files = _files;
+
+            new Thread(() =>
+            {
+                string error = ReportMailer.Send(_cfg, _report, files, sender, _log.Add);
+                SaveFixLog(logStart);
+                BeginInvoke(new Action(() =>
+                {
+                    _running = false;
+                    _openPdf.Enabled = _rescan.Enabled = _fix.Enabled = true;
+                    _status.Text = error == null ? L.T("mail.sent", _cfg.QcEmailAddress) : L.T("mail.failed", error);
+                    _status.ForeColor = error == null ? PassFg : FailFg;
+                    if (error == null) Dialogs.Inform(L.T("mail.sent", _cfg.QcEmailAddress), this);
+                    else Dialogs.Error(L.T("mail.failed", error), this);
+                }));
+            }) { IsBackground = true, Name = "mail" }.Start();
+        }
+
+        private static string _lastSender = "";        // offered again after "Scan again"
+
+        /// <summary>The operator's own email address, asked until it parses. Null = cancelled.</summary>
+        private string AskSender()
+        {
+            string text = _lastSender;
+            while (true)
+            {
+                text = Dialogs.AskText(L.T("mail.from"), text, this);
+                if (text == null) return null;
+                try
+                {
+                    var a = new System.Net.Mail.MailAddress(text);
+                    if (a.Address == text && text.Contains(".")) return _lastSender = text;
+                }
+                catch (FormatException) { }
+                Dialogs.Error(L.T("mail.badFrom", text), this);
+            }
+        }
+#endif
 
         public void ShowError(string message) => Invoke(new Action(() => Dialogs.Error(message, this)));
 
@@ -329,7 +401,33 @@ namespace DeviceScanner.UI
             if (!_running) return;
             // the checks cannot be interrupted half way (a homing program keeps running on the controller anyway)
             if (!Dialogs.Confirm(L.T("ui.quitRunning"), caution: true, owner: this)) { e.Cancel = true; return; }
+            _onStop?.Invoke();                           // never leave the conveyors jogging
             Environment.Exit(1);
+        }
+
+        // ---------- conveyor burn run ----------
+
+        /// <summary>Shows the stop button while the burn run goes; disposing the result hides it again.</summary>
+        public IDisposable ShowStop(Action stop)
+        {
+            Invoke(new Action(() => { _onStop = stop; _stopBurn.Enabled = true; _stopBurn.Visible = true; }));
+            return new StopButtonLease(() => Invoke(new Action(() => { _onStop = null; _stopBurn.Visible = false; })));
+        }
+
+        private void StopBurn()
+        {
+            var stop = _onStop;
+            if (stop == null) return;
+            _stopBurn.Enabled = false;
+            _status.Text = L.T("ui.stoppingBurn");
+            stop();
+        }
+
+        private sealed class StopButtonLease : IDisposable
+        {
+            private readonly Action _undo;
+            public StopButtonLease(Action undo) { _undo = undo; }
+            public void Dispose() => _undo();
         }
 
         // ---------- fixing ----------

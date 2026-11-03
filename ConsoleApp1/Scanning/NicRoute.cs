@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -14,6 +14,7 @@ namespace DeviceScanner.Scanning
         public string Description { get; set; }   // "Intel(R) I350 Gigabit Network Connection #2"
         public string Connection { get; set; }    // "Ethernet 3"
         public string PnpId { get; set; }         // PCI\VEN_8086&DEV_1521&SUBSYS...\...
+        public bool Up { get; set; }              // link connected (only filled by WithPnp)
 
         /// <summary>PCI\VEN_8086&DEV_1521 part only.</summary>
         public string ShortPnpId
@@ -52,6 +53,14 @@ namespace DeviceScanner.Scanning
 
             return new LocalNic { Description = nic.Description, Connection = nic.Name, PnpId = PnpIdOf(nic.Id) };
         }
+
+        /// <summary>Every network adapter Windows lists (up or not) whose PnP id contains <paramref name="pnp"/>.</summary>
+        public static LocalNic[] WithPnp(string pnp) =>
+            NetworkInterface.GetAllNetworkInterfaces()
+                .Select(n => new { n, Pnp = PnpIdOf(n.Id) })
+                .Where(x => x.Pnp.IndexOf(pnp, StringComparison.OrdinalIgnoreCase) >= 0)
+                .Select(x => new LocalNic { Description = x.n.Description, Connection = x.n.Name, PnpId = x.Pnp, Up = x.n.OperationalStatus == OperationalStatus.Up })
+                .ToArray();
 
         /// <summary>PnP instance id (PCI\VEN_...) of an adapter by its NetworkInterface.Id, or "" if unknown.</summary>
         public static string PnpIdOf(string interfaceId)

@@ -1,4 +1,4 @@
-# ==============================================================
+﻿# ==============================================================
 # DeviceScanner machine profile
 # EXAMPLE built from the SD1X block in FactoryReset - edit it to match the real machine.
 # To test another machine, copy this file and change the values. Nothing else needs editing.
@@ -71,3 +71,16 @@ io = Station 2 clean press    | 49 | 23 | 1000
 io = Station 2 clean vac      | 50 | 23 | 1000
 
 io = Nozzle clean             | 55 | 52 | 1000
+
+# ---------- burn run (lite only; the full edition ignores these lines) ----------
+# From the controller project D:\ssvbas.zip  SD1X\SD1_ZMC432_R7.2 (USE THIS):
+#   axes  left gantry X 6, Y 7, Z 8 | right gantry X 9, Y 10, Z 11, UNITS 2000; Z axes DRIVE_PROFILE 5
+#   RunLeft.bas   left gantry burn-in: X/Y SPEED 1000, Z 100, ACCEL 3000/500, never ends on its own
+#   RunRight.bas  right gantry burn-in: same speeds
+#   MotionStop.bas  STOP "RunLeft.bas" / STOP "RunRight.bas", then CANCEL(2) on axes 6-11
+#   conveyors  axes 0 and 1, CUNITS 22.15, CSPEED 100, CACCEL 500 (INITSYSTEM sets only ATYPE/UNITS for them)
+# The SD1 conveyor (clamps, left/right SMEMA flow) is not the I10_TWIN_DL lane sequence, so no burn.lane here:
+# the burn run only runs the gantry programs until Stop.
+burn.programs = RunLeft, RunRight
+burn.stop     = MotionStop
+burn.speed    = 100, 20, 0
