@@ -134,6 +134,10 @@ namespace DeviceScanner.UI
 
         public bool Ask(string question, bool caution) => (bool)Invoke(new Func<bool>(() => Dialogs.Confirm(question, caution, owner: this)));
 
+        /// <summary>Hours / minutes / seconds from the operator; null = cancelled.</summary>
+        public TimeSpan? AskDuration(string question, TimeSpan initial) =>
+            (TimeSpan?)Invoke(new Func<TimeSpan?>(() => Dialogs.AskDuration(question, initial, this)));
+
         public void Begin(Module m) => Invoke(new Action(() =>
         {
             ShowNewLog();

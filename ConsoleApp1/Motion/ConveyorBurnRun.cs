@@ -12,7 +12,9 @@ namespace DeviceScanner.Motion
     /// <summary>
     /// Conveyor dry run, ported from OneDispenser TF_CONVEYOR / I10_TWIN_DL.LoadBoardDryRun_C1 and _C2:
     /// per lane, return the board to board-in, (load PRE), load PRO A, load out. Lane 1 then lane 2, over
-    /// and over until Stop() is called. A sensor or feedback timeout stops it as a failure.
+    /// and over until the set run time is up (the cycle in progress is finished first) or Stop() is called.
+    /// A sensor or feedback timeout stops it as a failure. The conveyor and gantry axes run at burn.ratio
+    /// (default 100 %) of their original programmed speeds.
     /// Every controller call goes through one lock, so Stop() can halt the conveyors from the UI thread.
     /// </summary>
     internal sealed class ConveyorBurnRun
@@ -21,6 +23,8 @@ namespace DeviceScanner.Motion
         private readonly MachineProfile _profile;
         private readonly BurnRunSetup _b;
         private readonly Action<string> _log;
+        private readonly TimeSpan _duration;                // zero = until Stop()
+        private readonly Stopwatch _clock = new Stopwatch();
         private readonly object _gate = new object();
         private ZmcConnection _zmc;
         private volatile bool _stop;
@@ -28,10 +32,14 @@ namespace DeviceScanner.Motion
 
         private sealed class StopRequested : Exception { }
 
-        public ConveyorBurnRun(ScanConfig cfg, MachineProfile profile, Action<string> log)
+        /// <param name="duration">How long to run; TimeSpan.Zero = until Stop().</param>
+        public ConveyorBurnRun(ScanConfig cfg, MachineProfile profile, TimeSpan duration, Action<string> log)
         {
             _cfg = cfg; _profile = profile; _b = profile.Burn; _log = log;
+            _duration = duration < TimeSpan.Zero ? TimeSpan.Zero : duration;
         }
+
+        private bool TimeUp => _duration > TimeSpan.Zero && _clock.Elapsed >= _duration;
 
         /// <summary>Operator stop: ends the run after halting the conveyors now. Safe from any thread.</summary>
         public void Stop()
@@ -42,8 +50,8 @@ namespace DeviceScanner.Motion
 
         public BurnRunResult Run()
         {
-            var sw = Stopwatch.StartNew();
-            var result = new BurnRunResult();
+            _clock.Restart();
+            var result = new BurnRunResult { Planned = _duration, SpeedPercent = _b.SpeedPercent };
             result.Lanes.AddRange(_b.Lanes.Select(l => new BurnLaneResult { Name = l.Name }));
 
             using (var zmc = new ZmcConnection())
@@ -54,7 +62,15 @@ namespace DeviceScanner.Motion
                     if (!zmc.Open(_profile.ZmcIp)) Fail($"cannot open ZMC at {_profile.ZmcIp}");
                     else if (!new ZmcInit(_cfg, _profile.InitProgram, _log).EnsureReady(zmc))
                         Fail($"{_profile.InitProgram} did not bring the controller to sysstate=1");
-                    else if (StartPrograms(result)) Loop(result);
+                    else
+                    {
+                        _clock.Restart();                 // the set run time counts from here, not from controller init
+                        _log(_duration > TimeSpan.Zero
+                            ? $"  run time {BurnRunResult.Hms(_duration)}, until about {DateTime.Now.Add(_duration):yyyy-MM-dd HH:mm:ss}"
+                            : "  run time: until Stop");
+                        SetSpeedRatio();
+                        if (StartPrograms(result)) Loop(result);
+                    }
                 }
                 catch (StopRequested) { }
                 finally
@@ -67,12 +83,35 @@ namespace DeviceScanner.Motion
                 }
             }
 
-            result.StoppedByOperator = _stop;
-            result.Detail = _failure;
             result.Failed = _failure.Length > 0;
-            result.Elapsed = sw.Elapsed;
-            _log(result.Failed ? $"  burn run FAILED: {_failure}" : "  burn run stopped by the operator");
+            result.Completed = !result.Failed && TimeUp;
+            result.StoppedByOperator = _stop && !result.Completed;
+            result.Detail = _failure;
+            result.Elapsed = _clock.Elapsed;
+            _log(result.Failed ? $"  burn run FAILED: {_failure}"
+                 : result.Completed ? $"  burn run finished: set run time {BurnRunResult.Hms(_duration)} reached"
+                 : "  burn run stopped by the operator");
             return result;
+        }
+
+        /// <summary>
+        /// SPEED_RATIO = burn.ratio on every conveyor axis and every gantry axis (home.axes), so the burn programs
+        /// and the conveyor jog run at that share of their own SPEED (100 % = the original parameters), whatever
+        /// override the machine software left on the controller.
+        /// </summary>
+        private void SetSpeedRatio()
+        {
+            string r = (_b.SpeedPercent / 100.0).ToString("0.###", CultureInfo.InvariantCulture);
+            var axes = _b.Lanes.SelectMany(l => l.Axes).Concat(_profile.HomeAxes).Distinct().OrderBy(a => a).ToList();
+            if (axes.Count == 0) return;
+            _log($"  speed {_b.SpeedPercent:0.#} % of the original parameters (SPEED_RATIO={r}) on axes {string.Join(", ", axes)}");
+            lock (_gate)
+                foreach (int a in axes)
+                {
+                    int rc = _zmc.Execute($"SPEED_RATIO AXIS({a})={r}", out string resp);
+                    if (rc != 0 || resp.IndexOf("error", StringComparison.OrdinalIgnoreCase) >= 0)
+                        _log($"  ! SPEED_RATIO AXIS({a}) not set (rc={rc}, reply \"{resp}\"); the axis keeps its current ratio");
+                }
         }
 
         /// <summary>RUN each burn.programs entry (e.g. RUNXY, RUNZ) so the gantry moves while the conveyors cycle.</summary>
@@ -94,12 +133,15 @@ namespace DeviceScanner.Motion
 
         private void Loop(BurnRunResult result)
         {
-            if (_b.Lanes.Count == 0)                      // programs only: keep them running until Stop
-                while (!_stop) Pause(200);
-
-            while (!_stop)
+            if (_b.Lanes.Count == 0)                      // programs only: keep them running until the time is up or Stop
             {
-                for (int i = 0; i < _b.Lanes.Count && !_stop; i++)
+                while (!_stop && !TimeUp) Pause(200);
+                return;
+            }
+
+            while (!_stop && !TimeUp)
+            {
+                for (int i = 0; i < _b.Lanes.Count && !_stop && !TimeUp; i++)
                 {
                     var lane = _b.Lanes[i];
                     var lr = result.Lanes[i];

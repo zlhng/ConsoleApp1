@@ -166,14 +166,16 @@ namespace DeviceScanner.Reporting
             var t = DataTable(new float[] { 10, 20, 12, 58 },
                 L.T("col.status"), L.T("col.lane"), L.T("col.cycles"), L.T("col.detail"));
             int row = 0;
+            string end = b.Completed ? L.T("burn.done", BurnRunResult.Hms(b.Planned))
+                       : b.StoppedByOperator ? L.T("burn.stopped") : "";
             foreach (var l in b.Lanes)
             {
                 bool failed = l.Failure.Length > 0;
                 Row(t, row++, failed ? Tone.Fail : Tone.Pass, L.T(failed ? "tag.fail" : "tag.pass"),
-                    l.Name, l.Cycles.ToString(), failed ? l.Failure : b.StoppedByOperator ? L.T("burn.stopped") : "");
+                    l.Name, l.Cycles.ToString(), failed ? l.Failure : end);
             }
             foreach (string program in b.Programs)
-                Row(t, row++, Tone.Pass, L.T("tag.pass"), "RUN " + program, "", b.StoppedByOperator ? L.T("burn.stopped") : "");
+                Row(t, row++, Tone.Pass, L.T("tag.pass"), "RUN " + program, "", end);
             if (b.Failed && b.Lanes.All(l => l.Failure.Length == 0))
                 Row(t, row, Tone.Fail, L.T("tag.fail"), "", "", b.Detail);
             doc.Add(t);

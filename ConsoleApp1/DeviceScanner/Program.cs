@@ -66,7 +66,14 @@ namespace DeviceScanner
             ScanWindow window = null;                                  // device address changes are confirmed in it
             Func<string, bool> confirm = q => window.Ask(q, true);
             Func<Action, IDisposable> stopButton = stop => window.ShowStop(stop);
-            List<Step> steps = Steps(cfg, profile, report, log.Add, confirm, stopButton);
+            TimeSpan lastBurnTime = TimeSpan.FromHours(1);                   // offered again on "Scan again"
+            Func<TimeSpan?> askBurnTime = () =>
+            {
+                TimeSpan? t = window.AskDuration(L.T("prompt.burnTime"), lastBurnTime);
+                if (t != null) lastBurnTime = t.Value;
+                return t;
+            };
+            List<Step> steps = Steps(cfg, profile, report, log.Add, confirm, stopButton, askBurnTime);
 
 #if LITE
             bool? runAll = ConfirmFullRun(steps) ? true : (bool?)null;      // lite: always a full run
@@ -85,7 +92,7 @@ namespace DeviceScanner
 
                 log = new RunLog();
                 report = new RunReport(profile) { UserName = user, StartedAt = DateTime.Now };
-                steps = Steps(cfg, profile, report, log.Add, confirm, stopButton);
+                steps = Steps(cfg, profile, report, log.Add, confirm, stopButton, askBurnTime);
             }
         }
 
@@ -95,7 +102,8 @@ namespace DeviceScanner
         /// No other Windows spec checks, no discovery, no IO loopback.
         /// </summary>
         private static List<Step> Steps(ScanConfig cfg, MachineProfile profile, RunReport report, Action<string> log,
-                                            Func<string, bool> confirm, Func<Action, IDisposable> stopButton) => new List<Step>
+                                            Func<string, bool> confirm, Func<Action, IDisposable> stopButton,
+                                            Func<TimeSpan?> askBurnTime) => new List<Step>
         {
             new Step { Module = Module.WindowsSpec, Work = () => report.WindowsSpec = new WindowsSpecChecker(cfg, new WindowsSpecConfig(), profile, log).Run() },
 
@@ -109,17 +117,21 @@ namespace DeviceScanner
             new Step { Module = Module.BurnRun, Caution = true, AlwaysAsk = true, Available = profile.Burn.Configured,
                        Ready = () => report.Home?.Success == true,
                        Question = L.T("prompt.burn", string.Join(", ", profile.Burn.Lanes.Select(l => l.Name)
-                                                                  .Concat(profile.Burn.Programs.Select(x => "RUN " + x)))),
+                                                                  .Concat(profile.Burn.Programs.Select(x => "RUN " + x))),
+                                      profile.Burn.SpeedPercent),
                        Work = () =>
                        {
-                           var burn = new ConveyorBurnRun(cfg, profile, log);
+                           TimeSpan? runTime = askBurnTime();                 // cancelled = burn run skipped
+                           if (runTime == null) { log(L.T("burn.cancelled")); return; }
+                           var burn = new ConveyorBurnRun(cfg, profile, runTime.Value, log);
                            using (stopButton(burn.Stop)) report.BurnRun = burn.Run();
                        } },
         };
 #else
         /// <summary>The modules in the order they run.</summary>
         private static List<Step> Steps(ScanConfig cfg, MachineProfile profile, RunReport report, Action<string> log,
-                                            Func<string, bool> confirm, Func<Action, IDisposable> stopButton) => new List<Step>
+                                            Func<string, bool> confirm, Func<Action, IDisposable> stopButton,
+                                            Func<TimeSpan?> askBurnTime) => new List<Step>
         {
             // 0. Windows golden-image spec (read only: OS, locale, Defender, NIC settings, drivers, apps, Chinese file names)
             new Step { Module = Module.WindowsSpec, Question = L.T("prompt.spec"),

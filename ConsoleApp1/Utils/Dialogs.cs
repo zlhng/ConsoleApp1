@@ -87,6 +87,37 @@ namespace DeviceScanner.Utils
             }
         }
 
+        /// <summary>
+        /// Hours / minutes / seconds. Returns the time (all zero = TimeSpan.Zero), or null if cancelled.
+        /// </summary>
+        public static TimeSpan? AskDuration(string question, TimeSpan initial, IWin32Window owner = null)
+        {
+            var hours = Spin(999, (int)initial.TotalHours);
+            var minutes = Spin(59, initial.Minutes);
+            var seconds = Spin(59, initial.Seconds);
+            var row = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+            row.Controls.AddRange(new Control[]
+            {
+                hours, Unit(L.T("lbl.hours")), minutes, Unit(L.T("lbl.minutes")), seconds, Unit(L.T("lbl.seconds")),
+            });
+
+            using (var form = new PromptForm(question, SystemIcons.Question, L.T("btn.ok"), L.T("btn.cancel"), row, focusOk: true))
+            {
+                form.ActiveControl = hours;
+                hours.Select(0, hours.Text.Length);
+                if (Show(form, owner) != DialogResult.OK) return null;
+                return new TimeSpan((int)hours.Value, (int)minutes.Value, (int)seconds.Value);
+            }
+        }
+
+        private static NumericUpDown Spin(int max, int value) => new NumericUpDown
+        {
+            Minimum = 0, Maximum = max, Value = Math.Min(Math.Max(value, 0), max), Width = 70,
+            TextAlign = HorizontalAlignment.Right, Margin = new Padding(0, 0, 6, 0),
+        };
+
+        private static Label Unit(string text) => new Label { Text = text, AutoSize = true, Margin = new Padding(0, 6, 18, 0) };
+
         /// <summary>Pick one item from a list (double-click or OK). Returns its index, or -1 if cancelled.</summary>
         public static int Choose(string question, IList<string> options, int selected = 0,
                                  string ok = null, string cancel = null, string caption = Caption)

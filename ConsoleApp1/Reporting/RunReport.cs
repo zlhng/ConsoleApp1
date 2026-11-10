@@ -52,6 +52,12 @@ namespace DeviceScanner.Reporting
         public bool Failed { get; set; }
         public string Detail { get; set; } = "";        // failure reason
         public bool StoppedByOperator { get; set; }
+        public bool Completed { get; set; }             // ran the full set time
+        public TimeSpan Planned { get; set; }           // set run time, zero = until Stop
+        public double SpeedPercent { get; set; } = 100; // SPEED_RATIO used, % of the original parameters
+
+        /// <summary>h:mm:ss</summary>
+        public static string Hms(TimeSpan t) => $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}";
         public List<BurnLaneResult> Lanes { get; } = new List<BurnLaneResult>();
         public List<string> Programs { get; } = new List<string>();    // controller programs that were started
         public TimeSpan Elapsed { get; set; }

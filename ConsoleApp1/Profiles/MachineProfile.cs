@@ -40,6 +40,7 @@ namespace DeviceScanner.Profiles
         public double Speed { get; set; } = 100;           // conveyor jog speed, controller units/s
         public double SlowSpeed { get; set; } = 20;
         public int SlowAfterMs { get; set; }               // 0 = never slow down
+        public double SpeedPercent { get; set; } = 100;    // SPEED_RATIO on the burn axes: 100 = the original programmed speeds
         public int LoadInDelayMs { get; set; }             // keep running this long after board present
         public double ReverseDist { get; set; }            // then back the conveyor off by this much (0 = no)
         public int SensorTimeoutMs { get; set; } = 10000;  // board-in / present / out sensors

@@ -84,3 +84,4 @@ io = Nozzle clean             | 55 | 52 | 1000
 burn.programs = RunLeft, RunRight
 burn.stop     = MotionStop
 burn.speed    = 100, 20, 0
+burn.ratio    = 100              # 100 % of the original speeds (SPEED_RATIO on home.axes)

@@ -53,6 +53,7 @@ namespace DeviceScanner.Profiles
                 case "io": p.IoTests.Add(ParseIo(val)); break;
                 case "burn.mode": p.Burn.UsePre = ParseMode(val); break;
                 case "burn.speed": ParseSpeed(p.Burn, val); break;
+                case "burn.ratio": ParseRatio(p.Burn, val); break;
                 case "burn.loadin": ParseLoadIn(p.Burn, val); break;
                 case "burn.timeout": ParseTimeout(p.Burn, val); break;
                 case "burn.lane": p.Burn.Lanes.Add(ParseLane(val)); break;
@@ -83,6 +84,14 @@ namespace DeviceScanner.Profiles
             b.Speed = ParseDouble(f[0], "speed");
             if (f.Length > 1) b.SlowSpeed = ParseDouble(f[1], "slow speed");
             if (f.Length > 2) b.SlowAfterMs = ParseInt(f[2], "slow after ms");
+        }
+
+        // burn.ratio = percent of the original programmed speed (SPEED_RATIO), 1 .. 100
+        private static void ParseRatio(BurnRunSetup b, string val)
+        {
+            double pct = ParseDouble(val.TrimEnd('%', ' '), "speed ratio %");
+            if (pct <= 0 || pct > 100) throw new FormatException($"burn.ratio must be 1 .. 100 (%), got \"{val}\"");
+            b.SpeedPercent = pct;
         }
 
         // burn.loadin = delay ms, reverse distance

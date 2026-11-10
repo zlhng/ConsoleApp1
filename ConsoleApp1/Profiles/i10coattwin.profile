@@ -107,6 +107,7 @@ io = Door lock                | 11 | 15 | 1000 | optional
 # A test board must be on each lane before starting.
 # burn.mode    = PRO | PRE_PRO
 # burn.speed   = fast, slow, slow after ms        (controller units/s; slow after 0 = never)
+# burn.ratio   = % of the original programmed speeds (SPEED_RATIO on lane + home.axes; default 100)
 # burn.loadin  = delay ms, reverse distance       (after board present)
 # burn.timeout = sensor ms, io ms
 # burn.lane    = name | conveyor axes | board-in IN | board-out IN | tension roller OP or -
@@ -140,6 +141,7 @@ burn.programs = RunXY, RunZ       # RUN "RunXY.bas", RUN "RunZ.bas" when the bur
 burn.stop     = MotionStop        # RUN "MotionStop.bas" on Stop (after STOP of each program)
 burn.mode    = PRO
 burn.speed   = 100, 20, 0         # CSPEED 100 mm/s from Variables.bas; slow speed unused while slow-after is 0
+burn.ratio   = 100               # 100 % of the original speeds (RunXY/RunZ SPEED, CSPEED)
 burn.loadin  = 0, 0
 burn.timeout = 10000, 5000
 burn.lane    = lane 1 | 0, 1 | 36 | 41 | -
