@@ -53,9 +53,15 @@
     <ErrorReport>prompt</ErrorReport>
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
-  <!-- Lite edition (drivers, profile IP / COM devices, homing; i10coattwin profile only): msbuild /p:Configuration=Lite /p:Platform=x64 -->
+  <!-- Lite edition (drivers, profile IP / COM devices, homing, burn run), built for one machine profile:
+         msbuild /p:Configuration=Lite /p:Platform=x64                      -> i10coattwin, bin\x64\Lite\
+         msbuild /p:Configuration=Lite /p:Platform=x64 /p:LiteProfile=sd1x  -> sd1x,        bin\x64\Lite_sd1x\
+         Only that profile is copied to the output, and the lite exe runs the one profile it finds there. -->
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Lite|x64'">
-    <OutputPath>bin\x64\Lite\</OutputPath>
+    <LiteProfile Condition="'$(LiteProfile)' == ''">i10coattwin</LiteProfile>
+    <OutputPath Condition="'$(LiteProfile)' == 'i10coattwin'">bin\x64\Lite\</OutputPath>
+    <OutputPath Condition="'$(LiteProfile)' != 'i10coattwin'">bin\x64\Lite_$(LiteProfile)\</OutputPath>
+    <IntermediateOutputPath Condition="'$(LiteProfile)' != 'i10coattwin'">obj\x64\Lite_$(LiteProfile)\</IntermediateOutputPath>
     <DefineConstants>TRACE;LITE</DefineConstants>
     <Optimize>true</Optimize>
     <DebugType>pdbonly</DebugType>
@@ -249,7 +255,7 @@
     <Content Include="Profiles\*.profile" Condition="'$(Configuration)' != 'Lite'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Profiles\i10coattwin.profile" Condition="'$(Configuration)' == 'Lite'">
+    <Content Include="Profiles\$(LiteProfile).profile" Condition="'$(Configuration)' == 'Lite'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

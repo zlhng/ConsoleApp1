@@ -15,7 +15,7 @@ namespace DeviceScanner.Profiles
         private const string Folder = "Profiles";
         private const string Pattern = "*.profile";
 #if LITE
-        private const string LiteProfile = "i10coattwin";      // the lite edition is built for this machine only
+        private const string LiteDefault = "i10coattwin";      // used when the folder holds more than one profile
 #endif
 
         public static MachineProfile Select(string[] args, Action<string> log)
@@ -24,7 +24,7 @@ namespace DeviceScanner.Profiles
             try
             {
 #if LITE
-                string path = Resolve(LiteProfile, dir);
+                string path = LitePath(dir);
 #else
                 string path = args.Length > 0 ? Resolve(args[0], dir) : Pick(dir, log);
 #endif
@@ -41,6 +41,19 @@ namespace DeviceScanner.Profiles
                 return null;
             }
         }
+
+#if LITE
+        /// <summary>
+        /// The lite edition is built for one machine (msbuild /p:LiteProfile=...), and only that profile is copied
+        /// next to the exe: run the one profile in the folder. If someone added more, fall back to i10coattwin.
+        /// </summary>
+        private static string LitePath(string dir)
+        {
+            string[] files = Directory.Exists(dir) ? Directory.GetFiles(dir, Pattern) : new string[0];
+            if (files.Length == 1) return files[0];
+            return Resolve(LiteDefault, dir);
+        }
+#endif
 
         private static string Resolve(string arg, string dir)
         {
