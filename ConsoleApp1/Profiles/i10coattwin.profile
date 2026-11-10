@@ -104,10 +104,12 @@ io = Door lock                | 11 | 15 | 1000 | optional
 # ---------- conveyor burn run (lite: asked after homing, runs until Stop) ----------
 # Port of OneDispenser I10_TWIN_DL.LoadBoardDryRun_C1 / _C2. Each cycle per lane:
 #   return to board-in -> (PRE_PRO: load PRE) -> load PRO A -> load out.  Lane 1 then lane 2, repeated.
-# A test board must be on each lane before starting.
+# burn.sensors = on: a test board must be on each lane before starting. Off (default): no board needed.
 # burn.mode    = PRO | PRE_PRO
 # burn.speed   = fast, slow, slow after ms        (controller units/s; slow after 0 = never)
 # burn.ratio   = % of the original programmed speeds (SPEED_RATIO on lane + home.axes; default 100)
+# burn.sensors = off | on   off (default): no test board, board-in/present/out sensors and vacuum feedback ignored
+# burn.jog     = ms each conveyor move runs when burn.sensors = off (default 3000)
 # burn.loadin  = delay ms, reverse distance       (after board present)
 # burn.timeout = sensor ms, io ms
 # burn.lane    = name | conveyor axes | board-in IN | board-out IN | tension roller OP or -
@@ -142,6 +144,8 @@ burn.stop     = MotionStop        # RUN "MotionStop.bas" on Stop (after STOP of 
 burn.mode    = PRO
 burn.speed   = 100, 20, 0         # CSPEED 100 mm/s from Variables.bas; slow speed unused while slow-after is 0
 burn.ratio   = 100               # 100 % of the original speeds (RunXY/RunZ SPEED, CSPEED)
+burn.sensors = off               # run on time only, no board / board sensors needed
+burn.jog     = 3000              # each conveyor move (back, in, out) runs 3 s
 burn.loadin  = 0, 0
 burn.timeout = 10000, 5000
 burn.lane    = lane 1 | 0, 1 | 36 | 41 | -

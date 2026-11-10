@@ -34,6 +34,7 @@ namespace DeviceScanner.Profiles
             {
                 if (lane.Pro == null) throw new FormatException($"{file}: burn lane \"{lane.Name}\" has no PRO station");
                 if (p.Burn.UsePre && lane.Pre == null) throw new FormatException($"{file}: burn.mode = PRE_PRO but lane \"{lane.Name}\" has no PRE station");
+                if (!p.Burn.UseBoardSensors && p.Burn.JogMs <= 0) throw new FormatException($"{file}: burn.jog must be more than 0 ms when burn.sensors = off");
             }
             return p;
         }
@@ -54,6 +55,8 @@ namespace DeviceScanner.Profiles
                 case "burn.mode": p.Burn.UsePre = ParseMode(val); break;
                 case "burn.speed": ParseSpeed(p.Burn, val); break;
                 case "burn.ratio": ParseRatio(p.Burn, val); break;
+                case "burn.sensors": p.Burn.UseBoardSensors = ParseOnOff(val, "burn.sensors"); break;
+                case "burn.jog": p.Burn.JogMs = ParseInt(val, "burn.jog ms"); break;
                 case "burn.loadin": ParseLoadIn(p.Burn, val); break;
                 case "burn.timeout": ParseTimeout(p.Burn, val); break;
                 case "burn.lane": p.Burn.Lanes.Add(ParseLane(val)); break;
@@ -84,6 +87,16 @@ namespace DeviceScanner.Profiles
             b.Speed = ParseDouble(f[0], "speed");
             if (f.Length > 1) b.SlowSpeed = ParseDouble(f[1], "slow speed");
             if (f.Length > 2) b.SlowAfterMs = ParseInt(f[2], "slow after ms");
+        }
+
+        private static bool ParseOnOff(string val, string key)
+        {
+            switch (val.ToLowerInvariant())
+            {
+                case "on": case "yes": case "1": case "true": return true;
+                case "off": case "no": case "0": case "false": return false;
+                default: throw new FormatException($"{key} must be on or off, got \"{val}\"");
+            }
         }
 
         // burn.ratio = percent of the original programmed speed (SPEED_RATIO), 1 .. 100

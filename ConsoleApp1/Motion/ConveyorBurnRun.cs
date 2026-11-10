@@ -13,6 +13,9 @@ namespace DeviceScanner.Motion
     /// Conveyor dry run, ported from OneDispenser TF_CONVEYOR / I10_TWIN_DL.LoadBoardDryRun_C1 and _C2:
     /// per lane, return the board to board-in, (load PRE), load PRO A, load out. Lane 1 then lane 2, over
     /// and over until the set run time is up (the cycle in progress is finished first) or Stop() is called.
+    /// Board-free by default (burn.sensors = off): no test board and no board-in / present / out sensor is
+    /// needed; each conveyor move runs for burn.jog ms instead of until a sensor, and vacuum feedback is not
+    /// waited for. With burn.sensors = on it is the original sensor-driven sequence.
     /// A sensor or feedback timeout stops it as a failure. The conveyor and gantry axes run at burn.ratio
     /// (default 100 %) of their original programmed speeds.
     /// Every controller call goes through one lock, so Stop() can halt the conveyors from the UI thread.
@@ -68,6 +71,9 @@ namespace DeviceScanner.Motion
                         _log(_duration > TimeSpan.Zero
                             ? $"  run time {BurnRunResult.Hms(_duration)}, until about {DateTime.Now.Add(_duration):yyyy-MM-dd HH:mm:ss}"
                             : "  run time: until Stop");
+                        if (_b.Lanes.Count > 0)
+                            _log(_b.UseBoardSensors ? "  board sensors: on (board-in / present / out)"
+                                                    : $"  board sensors: off, no board needed; each conveyor move runs {_b.JogMs} ms");
                         SetSpeedRatio();
                         if (StartPrograms(result)) Loop(result);
                     }
@@ -165,7 +171,7 @@ namespace DeviceScanner.Motion
             _log("  return to board-in");
             foreach (var s in lane.Stations) if (!Unlock(s)) return false;
             Jog(lane, -_b.Speed);
-            try { return WaitIn(lane.BoardIn, true, _b.SensorTimeoutMs, "board-in sensor", null); }
+            try { return WaitBoard(lane.BoardIn, "board-in sensor"); }
             finally { StopConv(lane); }
         }
 
@@ -176,7 +182,7 @@ namespace DeviceScanner.Motion
             if (!On(pre.Stopper, pre.Name + " stopper")) return false;
             Tension(lane, true);
             if (!Off(pre.Lifter, pre.Name + " lifter")) return false;
-            try { if (!WaitIn(lane.BoardIn, true, _b.SensorTimeoutMs, "board-in sensor", null)) return false; }
+            try { if (_b.UseBoardSensors && !WaitIn(lane.BoardIn, true, _b.SensorTimeoutMs, "board-in sensor", null)) return false; }
             finally { StopConv(lane); Tension(lane, false); }
 
             if (!RunToPresent(lane, pre)) return false;
@@ -195,8 +201,11 @@ namespace DeviceScanner.Motion
                 if (!On(pro.Stopper, pro.Name + " stopper")) return false;
                 if (pre != null && !Off(pre.Stopper, pre.Name + " stopper")) return false;
                 if (!Off(pro.Lifter, pro.Name + " lifter")) return false;
-                bool alreadyIn = (pre != null && IsOn(pre.Present)) || IsOn(pro.Present);
-                if (!alreadyIn && !WaitIn(lane.BoardIn, true, _b.SensorTimeoutMs, "board-in sensor", null)) return false;
+                if (_b.UseBoardSensors)
+                {
+                    bool alreadyIn = (pre != null && IsOn(pre.Present)) || IsOn(pro.Present);
+                    if (!alreadyIn && !WaitIn(lane.BoardIn, true, _b.SensorTimeoutMs, "board-in sensor", null)) return false;
+                }
             }
             finally { StopConv(lane); Tension(lane, false); }
 
@@ -214,7 +223,7 @@ namespace DeviceScanner.Motion
                 if (!Unlock(pro)) return false;
                 Pause(500);
                 Jog(lane, _b.Speed);
-                return WaitIn(lane.BoardOut, true, _b.SensorTimeoutMs, "board-out sensor", null);
+                return WaitBoard(lane.BoardOut, "board-out sensor");
             }
             finally { Tension(lane, false); StopConv(lane); }
         }
@@ -222,6 +231,14 @@ namespace DeviceScanner.Motion
         /// <summary>Jogs until the station's board-present sensor (slow after SlowAfterMs), then delay, stop and back off.</summary>
         private bool RunToPresent(BurnLane lane, BurnStation station)
         {
+            if (!_b.UseBoardSensors)                      // board-free: run the conveyor for burn.jog, no sensor
+            {
+                Jog(lane, _b.Speed);
+                try { Pause(_b.JogMs); Pause(_b.LoadInDelayMs); }
+                finally { StopConv(lane); }
+                if (_b.ReverseDist != 0) MoveRel(lane, -_b.ReverseDist);
+                return true;
+            }
             if (station.Present == null) return Fail($"{station.Name}: no board present input in the profile");
             bool slow = false;
             Jog(lane, _b.Speed);
@@ -244,15 +261,16 @@ namespace DeviceScanner.Motion
 
         // ---------- station lock / unlock (TF_WorkingStation) ----------
 
+        // board-free: vacuum cannot build up without a board, so its feedback is not waited for
         private bool Lock(BurnStation s) =>
             On(s.Precisor, s.Name + " precisor")
-            && On(s.Vacuum, s.Name + " vacuum")
+            && Set(s.Vacuum, true, s.Name + " vacuum", _b.UseBoardSensors)
             && Off(s.Precisor, s.Name + " precisor")
             && On(s.Lifter, s.Name + " lifter");
 
         private bool Unlock(BurnStation s) =>
             Off(s.Precisor, s.Name + " precisor")
-            && Off(s.Vacuum, s.Name + " vacuum")
+            && Set(s.Vacuum, false, s.Name + " vacuum", _b.UseBoardSensors)
             && Off(s.Lifter, s.Name + " lifter")
             && Off(s.Stopper, s.Name + " stopper");
 
@@ -261,11 +279,20 @@ namespace DeviceScanner.Motion
         private bool On(IoPair p, string what) => Set(p, true, what);
         private bool Off(IoPair p, string what) => Set(p, false, what);
 
-        private bool Set(IoPair p, bool on, string what)
+        private bool Set(IoPair p, bool on, string what, bool feedback = true)
         {
             if (p.Out == null) return true;                     // not fitted
             Op(p.Out.Value, on);
+            if (!feedback) { Pause(200); return true; }
             return p.In == null || WaitIn(p.In.Value, on, _b.IoTimeoutMs, what, null);
+        }
+
+        /// <summary>Conveyor is jogging: wait for the board sensor, or (board-free) just let it run burn.jog ms.</summary>
+        private bool WaitBoard(int input, string what)
+        {
+            if (_b.UseBoardSensors) return WaitIn(input, true, _b.SensorTimeoutMs, what, null);
+            Pause(_b.JogMs);
+            return true;
         }
 
         private bool WaitIn(int input, bool level, int timeoutMs, string what, Action<long> tick)

@@ -43,6 +43,8 @@ namespace DeviceScanner.Profiles
         public double SpeedPercent { get; set; } = 100;    // SPEED_RATIO on the burn axes: 100 = the original programmed speeds
         public int LoadInDelayMs { get; set; }             // keep running this long after board present
         public double ReverseDist { get; set; }            // then back the conveyor off by this much (0 = no)
+        public bool UseBoardSensors { get; set; }          // false (default): no board needed, each conveyor move runs JogMs
+        public int JogMs { get; set; } = 3000;             // board-free mode: how long each conveyor move runs
         public int SensorTimeoutMs { get; set; } = 10000;  // board-in / present / out sensors
         public int IoTimeoutMs { get; set; } = 5000;       // stopper / lifter / precisor / vacuum feedback
         public List<BurnLane> Lanes { get; } = new List<BurnLane>();
