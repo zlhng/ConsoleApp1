@@ -53,6 +53,7 @@ namespace DeviceScanner.Reporting
         public string Detail { get; set; } = "";        // failure reason
         public bool StoppedByOperator { get; set; }
         public bool Completed { get; set; }             // ran the full set time
+        public bool Continuous { get; set; }            // conveyor jogged non-stop, no cycles counted
         public TimeSpan Planned { get; set; }           // set run time, zero = until Stop
         public double SpeedPercent { get; set; } = 100; // SPEED_RATIO used, % of the original parameters
 

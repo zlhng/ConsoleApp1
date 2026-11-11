@@ -123,7 +123,7 @@ namespace DeviceScanner.Reporting
                               : r.Home?.Success != true ? L.T("burn.needHome") : L.T("mod.skipped"));
 
             var b = r.BurnRun;
-            string lanes = string.Join("   ", b.Lanes.Select(l => L.T("burn.laneCycles", l.Name, l.Cycles))
+            string lanes = string.Join("   ", b.Lanes.Select(l => b.Continuous ? L.T("burn.laneContinuous", l.Name) : L.T("burn.laneCycles", l.Name, l.Cycles))
                                                .Concat(b.Programs.Count > 0 ? new[] { L.T("burn.programs", string.Join(", ", b.Programs)) } : new string[0]));
             string summary = L.T("burn.summary", lanes, b.Elapsed.TotalMinutes)
                              + "   " + (b.Planned > TimeSpan.Zero ? L.T("burn.planned", BurnRunResult.Hms(b.Planned)) : L.T("burn.untilStop"))
@@ -138,10 +138,10 @@ namespace DeviceScanner.Reporting
             {
                 var early = new ModuleResult { Status = ModuleStatus.Warn, Warnings = 1, Summary = summary };
                 early.Problems.Add(L.T("burn.early", BurnRunResult.Hms(b.Elapsed), BurnRunResult.Hms(b.Planned)));
-                if (b.Lanes.Count > 0 && b.Lanes.Sum(l => l.Cycles) == 0) early.Problems.Add(L.T("burn.noCycle"));
+                if (!b.Continuous && b.Lanes.Count > 0 && b.Lanes.Sum(l => l.Cycles) == 0) early.Problems.Add(L.T("burn.noCycle"));
                 return early;
             }
-            if (b.Lanes.Count > 0 && b.Lanes.Sum(l => l.Cycles) == 0)
+            if (!b.Continuous && b.Lanes.Count > 0 && b.Lanes.Sum(l => l.Cycles) == 0)
             {
                 var warn = new ModuleResult { Status = ModuleStatus.Warn, Warnings = 1, Summary = summary };
                 warn.Problems.Add(L.T("burn.noCycle"));

@@ -30,7 +30,7 @@ namespace DeviceScanner.Profiles
             }
 
             if (string.IsNullOrWhiteSpace(p.ZmcIp)) throw new FormatException($"{file}: zmc.ip is required");
-            foreach (var lane in p.Burn.Lanes)
+            foreach (var lane in p.Burn.Lanes.Where(l => !p.Burn.ContinuousConveyor))   // continuous: lanes need only their axes
             {
                 if (lane.Pro == null) throw new FormatException($"{file}: burn lane \"{lane.Name}\" has no PRO station");
                 if (p.Burn.UsePre && lane.Pre == null) throw new FormatException($"{file}: burn.mode = PRE_PRO but lane \"{lane.Name}\" has no PRE station");
@@ -57,6 +57,8 @@ namespace DeviceScanner.Profiles
                 case "burn.ratio": ParseRatio(p.Burn, val); break;
                 case "burn.sensors": p.Burn.UseBoardSensors = ParseOnOff(val, "burn.sensors"); break;
                 case "burn.jog": p.Burn.JogMs = ParseInt(val, "burn.jog ms"); break;
+                case "burn.conveyor": p.Burn.ContinuousConveyor = ParseChoice(val, "burn.conveyor", "cycle", "continuous"); break;
+                case "burn.time": p.Burn.AskRunTime = !ParseChoice(val, "burn.time", "ask", "stop"); break;
                 case "burn.loadin": ParseLoadIn(p.Burn, val); break;
                 case "burn.timeout": ParseTimeout(p.Burn, val); break;
                 case "burn.lane": p.Burn.Lanes.Add(ParseLane(val)); break;
@@ -87,6 +89,14 @@ namespace DeviceScanner.Profiles
             b.Speed = ParseDouble(f[0], "speed");
             if (f.Length > 1) b.SlowSpeed = ParseDouble(f[1], "slow speed");
             if (f.Length > 2) b.SlowAfterMs = ParseInt(f[2], "slow after ms");
+        }
+
+        /// <summary>false for <paramref name="no"/>, true for <paramref name="yes"/>.</summary>
+        private static bool ParseChoice(string val, string key, string no, string yes)
+        {
+            if (string.Equals(val, no, StringComparison.OrdinalIgnoreCase)) return false;
+            if (string.Equals(val, yes, StringComparison.OrdinalIgnoreCase)) return true;
+            throw new FormatException($"{key} must be {no} or {yes}, got \"{val}\"");
         }
 
         private static bool ParseOnOff(string val, string key)

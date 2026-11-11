@@ -172,7 +172,7 @@ namespace DeviceScanner.Reporting
             {
                 bool failed = l.Failure.Length > 0;
                 Row(t, row++, failed ? Tone.Fail : Tone.Pass, L.T(failed ? "tag.fail" : "tag.pass"),
-                    l.Name, l.Cycles.ToString(), failed ? l.Failure : end);
+                    l.Name, b.Continuous ? L.T("burn.continuous") : l.Cycles.ToString(), failed ? l.Failure : end);
             }
             foreach (string program in b.Programs)
                 Row(t, row++, Tone.Pass, L.T("tag.pass"), "RUN " + program, "", end);

@@ -13,6 +13,7 @@ namespace DeviceScanner.Motion
     /// Conveyor dry run, ported from OneDispenser TF_CONVEYOR / I10_TWIN_DL.LoadBoardDryRun_C1 and _C2:
     /// per lane, return the board to board-in, (load PRE), load PRO A, load out. Lane 1 then lane 2, over
     /// and over until the set run time is up (the cycle in progress is finished first) or Stop() is called.
+    /// burn.conveyor = continuous: the conveyor only jogs forward until Stop (no stations, IO or sensors).
     /// Board-free by default (burn.sensors = off): no test board and no board-in / present / out sensor is
     /// needed; each conveyor move runs for burn.jog ms instead of until a sensor, and vacuum feedback is not
     /// waited for. With burn.sensors = on it is the original sensor-driven sequence.
@@ -71,7 +72,9 @@ namespace DeviceScanner.Motion
                         _log(_duration > TimeSpan.Zero
                             ? $"  run time {BurnRunResult.Hms(_duration)}, until about {DateTime.Now.Add(_duration):yyyy-MM-dd HH:mm:ss}"
                             : "  run time: until Stop");
-                        if (_b.Lanes.Count > 0)
+                        if (_b.Lanes.Count > 0 && _b.ContinuousConveyor)
+                            _log("  conveyor: runs forward continuously, no stations, no board sensors");
+                        else if (_b.Lanes.Count > 0)
                             _log(_b.UseBoardSensors ? "  board sensors: on (board-in / present / out)"
                                                     : $"  board sensors: off, no board needed; each conveyor move runs {_b.JogMs} ms");
                         SetSpeedRatio();
@@ -142,6 +145,15 @@ namespace DeviceScanner.Motion
             if (_b.Lanes.Count == 0)                      // programs only: keep them running until the time is up or Stop
             {
                 while (!_stop && !TimeUp) Pause(200);
+                return;
+            }
+
+            if (_b.ContinuousConveyor)                    // conveyor jogs forward non-stop next to the gantry programs
+            {
+                foreach (var lane in _b.Lanes) Jog(lane, _b.Speed);
+                result.Continuous = true;
+                while (!_stop && !TimeUp) Pause(200);
+                foreach (var lane in _b.Lanes) StopConv(lane);
                 return;
             }
 

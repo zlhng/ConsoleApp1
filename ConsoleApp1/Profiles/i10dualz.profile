@@ -1,5 +1,5 @@
 # ==============================================================
-# DeviceScanner machine profile: I-SERIES DUAL Z (OneDispenser I_SERIES + I_SERIES_DUAL_Z)
+# DeviceScanner machine profile: I10 DUAL Z (OneDispenser I_SERIES + I_SERIES_DUAL_Z)
 # Built from OneDispenser TC_SYSTEM.FactoryReset (I_SERIES, non-TWIN branch), TC_GANTRY
 # (DUAL_Z is handled like N4: one gantry X / Y / Z / Z2) and TC_GANTRY.I10 (conveyor, IO).
 # Lines marked CHECK are not fixed by that code: confirm them on the machine.
@@ -8,7 +8,7 @@
 # Repeatable keys: home.programs, ip.expect, com.expect, io
 # ==============================================================
 
-name = I-SERIES-DUAL-Z
+name = I10-DUAL-Z
 
 # ---------- controller ----------
 # FactoryReset I_SERIES: X axis 6, Y axis 8, Z axis 9, Z encoder 4, conveyor axis 0, UNITS (PPU) 2000.
@@ -71,31 +71,22 @@ io = Clean vac                | 47 | 19 | 1000 | optional
 # door lock: only locks with the door closed
 io = Door lock                | 11 | 15 | 1000 | optional
 
-# ---------- conveyor burn run (lite: asked after homing, runs for the set time) ----------
-# Port of OneDispenser TC_GANTRY.I10.LoadBoardDryRun (used by DUAL_Z):
-#   return to board-in -> load to station 1 (PRO) -> load out.  One conveyor (axis 0), one lane.
-# burn.mode    = PRO | PRE_PRO
-# burn.speed   = fast, slow, slow after ms        (controller units/s; slow after 0 = never)
-# burn.ratio   = % of the original programmed speeds (SPEED_RATIO on lane + home.axes; default 100)
-# burn.sensors = off | on   off (default): no test board, board-in/present/out sensors and vacuum feedback ignored
-# burn.jog     = ms each conveyor move runs when burn.sensors = off (default 3000)
-# burn.loadin  = delay ms, reverse distance       (after board present)
-# burn.timeout = sensor ms, io ms
-# burn.lane    = name | conveyor axes | board-in IN | board-out IN | tension roller OP or -
-# burn.station = lane | PRE or PRO | stopper | lifter | precisor | vacuum | board present IN
-#                each module: out/in, out (no feedback) or - (not fitted)
+# ---------- burn run (lite: asked after homing, runs until Stop burn run) ----------
+# Gantry: the controller burn programs run non-stop. Conveyor: jogs forward non-stop at burn.speed.
+# No station sequence, no stopper / lifter / precisor / vacuum, no board or board sensors, no run time:
+# everything keeps going until the operator presses Stop burn run, then the programs are stopped
+# (burn.stop) and the conveyor is cancelled.
+# burn.conveyor = cycle | continuous   continuous: conveyor axes only jog forward, nothing else
+# burn.time     = ask | stop           stop: no hours/minutes/seconds prompt, runs until Stop
+# burn.speed    = conveyor jog speed (controller units/s)
+# burn.ratio    = % of the original programmed speeds (SPEED_RATIO on conveyor + home.axes; default 100)
+# burn.lane     = name | conveyor axes | board-in IN | board-out IN | tension roller OP or -
+#                 (continuous: only the axes are used; the sensor inputs are ignored)
 # burn.programs = controller programs RUN when the burn run starts, STOPped when it stops
-#
-# I10 drives the lifter with the up valve only and both precisors together; here precisor 1 (OUT 54) is
-# switched without waiting for feedback, and chuck vacuum is not used (I10 does not use it to load).
 burn.programs = RunXY, RunZ       # CHECK: gantry burn programs in this machine's ZMC project (as i-TWIN)
-burn.stop     = MotionStop        # CHECK: RUN on Stop; remove both lines to cycle the conveyor only
-burn.mode     = PRO
-burn.speed    = 100, 20, 0        # CSPEED 100 mm/s as the other I-series; slow speed unused while slow-after is 0
+burn.stop     = MotionStop        # CHECK: RUN on Stop (after STOP of each program)
+burn.conveyor = continuous
+burn.time     = stop
+burn.speed    = 100               # CSPEED 100 mm/s as the other I-series
 burn.ratio    = 100               # 100 % of the original speeds
-burn.sensors  = off               # run on time only, no board / board sensors needed
-burn.jog      = 3000              # each conveyor move (back, in, out) runs 3 s
-burn.loadin   = 0, 0
-burn.timeout  = 10000, 5000
-burn.lane     = lane 1 | 0 | 36 | 41 | -
-burn.station  = lane 1 | PRO | 36/38 | 37/39 | 54 | - | 37
+burn.lane     = conveyor | 0 | 36 | 41 | -     # conveyor axis 0 (I10 Conveyor_1)

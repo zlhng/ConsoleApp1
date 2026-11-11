@@ -116,12 +116,13 @@ namespace DeviceScanner
             // conveyor burn run, asked once homing has passed; runs until the operator presses Stop
             new Step { Module = Module.BurnRun, Caution = true, AlwaysAsk = true, Available = profile.Burn.Configured,
                        Ready = () => report.Home?.Success == true,
-                       Question = L.T("prompt.burn", string.Join(", ", profile.Burn.Lanes.Select(l => l.Name)
+                       Question = L.T(profile.Burn.AskRunTime ? "prompt.burn" : "prompt.burnStop", string.Join(", ", profile.Burn.Lanes.Select(l => l.Name)
                                                                   .Concat(profile.Burn.Programs.Select(x => "RUN " + x))),
                                       profile.Burn.SpeedPercent),
                        Work = () =>
                        {
-                           TimeSpan? runTime = askBurnTime();                 // cancelled = burn run skipped
+                           // burn.time = stop: no time asked, runs until Stop; otherwise cancelled = burn run skipped
+                           TimeSpan? runTime = profile.Burn.AskRunTime ? askBurnTime() : TimeSpan.Zero;
                            if (runTime == null) { log(L.T("burn.cancelled")); return; }
                            var burn = new ConveyorBurnRun(cfg, profile, runTime.Value, log);
                            using (stopButton(burn.Stop)) report.BurnRun = burn.Run();
