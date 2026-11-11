@@ -97,7 +97,7 @@ namespace DeviceScanner.UI
             _rescan = Button(L.T("ui.rescan"), (s, e) => { RescanRequested = true; Close(); });
             _rescan.Enabled = false;
 #if LITE
-            _openPdf = Button(L.T("ui.email"), (s, e) => Email());      // lite: the report goes to QC by email instead
+            _openPdf = Button(L.T("ui.savePdf"), (s, e) => SavePdfAs());   // lite: the operator saves the PDF where they want it
 #else
             _openPdf = Button(L.T("ui.openPdf"), (s, e) => Open(_files?.PdfPath));
 #endif
@@ -206,60 +206,43 @@ namespace DeviceScanner.UI
                     _report.WindowsSpec?.NicFixes.ToList() ?? new List<NicSettingFix>());
             Activate();
 #if LITE
-            if (_openPdf.Enabled) BeginInvoke(new Action(Email));      // asked once the window has settled
+            if (_openPdf.Enabled) BeginInvoke(new Action(SavePdfAs));  // asked once the window has settled
 #endif
         }));
 
 #if LITE
-        /// <summary>Asks, then emails the PDF and the log to the QC address on a worker thread (waits for the PC to be online).</summary>
-        private void Email()
+        private static string _lastSaveDir;           // offered again after "Scan again"
+
+        /// <summary>Save As dialog for the PDF report: copies it where the operator chooses (USB stick, share...).</summary>
+        private void SavePdfAs()
         {
-            if (_running || _files?.PdfPath == null) return;
-            if (!Dialogs.Confirm(L.T("mail.ask", _cfg.QcEmailAddress, string.Join(", ", _cfg.QcCc)), yesByDefault: true, owner: this)) return;
-            string sender = AskSender();
-            if (sender == null) return;
-            if (!Online.WaitFor(_cfg, q => Dialogs.Confirm(q, caution: true, yesByDefault: true, owner: this), _log.Add)) return;
-
-            _running = true;
-            _openPdf.Enabled = _rescan.Enabled = _fix.Enabled = false;
-            _status.Text = L.T("mail.sending", _cfg.QcEmailAddress) + "...";
-            _status.ForeColor = Muted;
-            int logStart = _log.Count;
-            var files = _files;
-
-            new Thread(() =>
+            if (_running || _files?.PdfPath == null || !File.Exists(_files.PdfPath)) return;
+            using (var dlg = new SaveFileDialog
             {
-                string error = ReportMailer.Send(_cfg, _report, files, sender, _log.Add);
-                SaveFixLog(logStart);
-                BeginInvoke(new Action(() =>
-                {
-                    _running = false;
-                    _openPdf.Enabled = _rescan.Enabled = _fix.Enabled = true;
-                    _status.Text = error == null ? L.T("mail.sent", _cfg.QcEmailAddress) : L.T("mail.failed", error);
-                    _status.ForeColor = error == null ? PassFg : FailFg;
-                    if (error == null) Dialogs.Inform(L.T("mail.sent", _cfg.QcEmailAddress), this);
-                    else Dialogs.Error(L.T("mail.failed", error), this);
-                }));
-            }) { IsBackground = true, Name = "mail" }.Start();
-        }
-
-        private static string _lastSender = "";        // offered again after "Scan again"
-
-        /// <summary>The operator's own email address, asked until it parses. Null = cancelled.</summary>
-        private string AskSender()
-        {
-            string text = _lastSender;
-            while (true)
+                Title = L.T("ui.savePdf"),
+                Filter = "PDF (*.pdf)|*.pdf",
+                DefaultExt = "pdf",
+                AddExtension = true,
+                OverwritePrompt = true,
+                FileName = Path.GetFileName(_files.PdfPath),
+                InitialDirectory = _lastSaveDir ?? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+            })
             {
-                text = Dialogs.AskText(L.T("mail.from"), text, this);
-                if (text == null) return null;
+                if (dlg.ShowDialog(this) != DialogResult.OK) return;
                 try
                 {
-                    var a = new System.Net.Mail.MailAddress(text);
-                    if (a.Address == text && text.Contains(".")) return _lastSender = text;
+                    if (!string.Equals(Path.GetFullPath(dlg.FileName), Path.GetFullPath(_files.PdfPath), StringComparison.OrdinalIgnoreCase))
+                        File.Copy(_files.PdfPath, dlg.FileName, true);
+                    _lastSaveDir = Path.GetDirectoryName(dlg.FileName);
+                    _log.Add(L.T("pdf.saved", dlg.FileName));
+                    _status.Text = L.T("pdf.saved", dlg.FileName);
+                    _status.ForeColor = PassFg;
                 }
-                catch (FormatException) { }
-                Dialogs.Error(L.T("mail.badFrom", text), this);
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is NotSupportedException)
+                {
+                    _log.Add(L.T("pdf.saveFailed", ex.Message));
+                    Dialogs.Error(L.T("pdf.saveFailed", ex.Message), this);
+                }
             }
         }
 #endif

@@ -59,9 +59,6 @@ namespace DeviceScanner.Utils
                 else if (a.Equals("--lang", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) chosen = args[++i];
                 else rest.Add(a);
             }
-#if LITE
-            chosen = "zh";                                  // the lite edition always runs in Chinese
-#endif
 
             if (chosen == null)
             {

@@ -50,11 +50,6 @@ namespace DeviceScanner
             // not elevated: start again through the UAC prompt and let that copy do the run
             if (AdminRestart.Run(ref args) != AdminRestart.Outcome.Continue) return;
             FirewallAccess.Allow(cfg, log.Add);     // so Windows never stops the scan to ask "Allow access?"
-#if LITE
-            // lite: never runs offline, the report is emailed to QC at the end
-            if (!Online.WaitFor(cfg, q => Dialogs.Confirm(q, caution: true, yesByDefault: true), log.Add)) return;
-            Online.Watch(s => log.Add(s));          // follows "log" across scan again; kept until the exe exits
-#endif
 
             string user = Dialogs.AskText(L.T("prompt.username"));     // who is running the audit, printed in the report as typed
             if (user == null) return;
@@ -183,13 +178,9 @@ namespace DeviceScanner
         {
             try
             {
-                bool stopped = false;               // lite: the PC went offline and the operator gave up waiting
                 foreach (var step in steps)
                 {
-#if LITE
-                    if (!stopped && !Online.WaitFor(cfg, q => window.Ask(q, true), log.Add)) { stopped = true; log.Add(L.T("online.stopped")); }
-#endif
-                    bool run = !stopped && step.Available && (step.Ready == null || step.Ready())
+                    bool run = step.Available && (step.Ready == null || step.Ready())
                                && (step.Question == null || (runAll && !step.AlwaysAsk) || window.Ask(step.Question, step.Caution));
                     if (run)
                     {

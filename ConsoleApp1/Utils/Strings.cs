@@ -77,6 +77,9 @@ namespace DeviceScanner.Utils
             ["ui.rescan"]        = new[] { "Scan again", "重新检测" },
             ["ui.fix"]           = new[] { "Fix problems ({0})", "修复问题（{0}）" },
             ["ui.email"]         = new[] { "Email report to QC", "发送报告给 QC" },
+            ["ui.savePdf"]       = new[] { "Save PDF as...", "PDF 另存为…" },
+            ["pdf.saved"]        = new[] { "PDF report saved: {0}", "PDF 报告已保存：{0}" },
+            ["pdf.saveFailed"]   = new[] { "The PDF was not saved: {0}", "PDF 保存失败：{0}" },
 
             // ----- online only / QC email (lite edition) -----
             ["online.required"]  = new[] { "This PC is offline: the mail server {0}:{1} cannot be reached.\n\nThe scanner only runs online. Connect the PC to the network, then choose Yes to try again (No stops).",

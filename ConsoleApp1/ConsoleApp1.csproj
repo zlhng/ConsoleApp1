@@ -54,14 +54,14 @@
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <!-- Lite edition (drivers, profile IP / COM devices, homing, burn run), built for one machine profile:
-         msbuild /p:Configuration=Lite /p:Platform=x64                             -> i10dualz,    bin\x64\Lite\
-         msbuild /p:Configuration=Lite /p:Platform=x64 /p:LiteProfile=i10coattwin  -> i10coattwin, bin\x64\Lite_i10coattwin\
+         msbuild /p:Configuration=Lite /p:Platform=x64                          -> i10coattwin, bin\x64\Lite\
+         msbuild /p:Configuration=Lite /p:Platform=x64 /p:LiteProfile=i10dualz  -> i10dualz,    bin\x64\Lite_i10dualz\
          Only that profile is copied to the output, and the lite exe runs the one profile it finds there. -->
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Lite|x64'">
-    <LiteProfile Condition="'$(LiteProfile)' == ''">i10dualz</LiteProfile>
-    <OutputPath Condition="'$(LiteProfile)' == 'i10dualz'">bin\x64\Lite\</OutputPath>
-    <OutputPath Condition="'$(LiteProfile)' != 'i10dualz'">bin\x64\Lite_$(LiteProfile)\</OutputPath>
-    <IntermediateOutputPath Condition="'$(LiteProfile)' != 'i10dualz'">obj\x64\Lite_$(LiteProfile)\</IntermediateOutputPath>
+    <LiteProfile Condition="'$(LiteProfile)' == ''">i10coattwin</LiteProfile>
+    <OutputPath Condition="'$(LiteProfile)' == 'i10coattwin'">bin\x64\Lite\</OutputPath>
+    <OutputPath Condition="'$(LiteProfile)' != 'i10coattwin'">bin\x64\Lite_$(LiteProfile)\</OutputPath>
+    <IntermediateOutputPath Condition="'$(LiteProfile)' != 'i10coattwin'">obj\x64\Lite_$(LiteProfile)\</IntermediateOutputPath>
     <DefineConstants>TRACE;LITE</DefineConstants>
     <Optimize>true</Optimize>
     <DebugType>pdbonly</DebugType>

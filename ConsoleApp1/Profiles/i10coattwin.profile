@@ -141,6 +141,9 @@ io = Door lock                | 11 | 15 | 1000 | optional
 #   conveyors  CONV1_AXIS 0, CONV2_AXIS 1, CUNITS 22.15 (6 mm roller, so mm), CSPEED 100, CACCEL 500 (set by InitSystem)
 burn.programs = RunXY, RunZ       # RUN "RunXY.bas", RUN "RunZ.bas" when the burn run starts
 burn.stop     = MotionStop        # RUN "MotionStop.bas" on Stop (after STOP of each program)
+burn.conveyor = continuous       # gantry programs + conveyor jogging forward non-stop; no stations, no board / sensors
+burn.time     = stop             # no run-time prompt: runs until Stop burn run
+                                 # (burn.conveyor = cycle / burn.time = ask bring back the lane cycle and h/m/s prompt)
 burn.mode    = PRO
 burn.speed   = 100, 20, 0         # CSPEED 100 mm/s from Variables.bas; slow speed unused while slow-after is 0
 burn.ratio   = 100               # 100 % of the original speeds (RunXY/RunZ SPEED, CSPEED)
