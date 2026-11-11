@@ -6,4 +6,7 @@
   <Project Path="ConsoleApp1/ConsoleApp1.csproj" Id="0ae7416e-21df-4e20-83e5-307fbd568a10">
     <Platform Solution="*|x64" Project="x64" />
   </Project>
+  <Project Path="LightScanner/LightScanner.csproj" Id="5b6f2a1c-8d4e-4f7a-9c3b-2e1d0a9f8b7c">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
 </Solution>
